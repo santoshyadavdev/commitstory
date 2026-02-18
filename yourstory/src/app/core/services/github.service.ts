@@ -13,9 +13,8 @@ interface ContributionsResponse {
 }
 
 interface DiscussionsResponse {
-  year: number;
-  discussions: number;
-  discussionComments: number;
+  lifetimeDiscussions: number;
+  lifetimeDiscussionComments: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -31,20 +30,20 @@ export class GitHubService {
   }
 
   /**
-   * Fetches discussion activity for a given year.
+   * Fetches lifetime discussion totals for the authenticated user.
+   * GitHub's API does not expose year-scoped discussion counts.
    */
-  getDiscussions(year: number): Observable<DiscussionsResponse> {
-    const params = new HttpParams().set('year', String(year));
-    return this.http.get<DiscussionsResponse>('/api/github/discussions', { params });
+  getDiscussions(): Observable<DiscussionsResponse> {
+    return this.http.get<DiscussionsResponse>('/api/github/discussions');
   }
 
   /**
-   * Combines contributions and discussions into a unified YearlyActivity object.
+   * Combines year-scoped contributions with lifetime discussion totals.
    */
   getYearlyActivity(year: number): Observable<YearlyActivity> {
     return forkJoin([
       this.getContributions(year),
-      this.getDiscussions(year),
+      this.getDiscussions(),
     ]).pipe(
       map(([contributions, discussions]) => ({
         year,
@@ -53,8 +52,8 @@ export class GitHubService {
         pullRequests: contributions.pullRequests,
         reviews: contributions.reviews,
         privateContributions: contributions.privateContributions,
-        discussions: discussions.discussions,
-        discussionComments: discussions.discussionComments,
+        lifetimeDiscussions: discussions.lifetimeDiscussions,
+        lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
       }))
     );
   }

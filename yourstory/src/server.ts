@@ -294,19 +294,14 @@ app.get('/api/github/discussions', async (req, res) => {
     return;
   }
 
-  const year =
-    parseInt(req.query['year'] as string) || new Date().getFullYear();
   const login = req.session.user.login;
 
-  const from = `${year}-01-01T00:00:00Z`;
-  const to = `${year}-12-31T23:59:59Z`;
-
+  // Note: GitHub's GraphQL API does not expose date-scoped counts for
+  // repositoryDiscussions or repositoryDiscussionComments, so these are
+  // lifetime totals for the authenticated user.
   const query = `
-    query($login: String!, $from: DateTime!, $to: DateTime!) {
+    query($login: String!) {
       user(login: $login) {
-        contributionsCollection(from: $from, to: $to) {
-          totalRepositoryContributions
-        }
         repositoryDiscussionComments(first: 1) {
           totalCount
         }
@@ -324,7 +319,7 @@ app.get('/api/github/discussions', async (req, res) => {
         Authorization: `Bearer ${req.session.accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query, variables: { login, from, to } }),
+      body: JSON.stringify({ query, variables: { login } }),
     });
 
     if (!response.ok) {
@@ -349,9 +344,8 @@ app.get('/api/github/discussions', async (req, res) => {
 
     const user = data.data?.user;
     res.json({
-      year,
-      discussions: user?.repositoryDiscussions?.totalCount ?? 0,
-      discussionComments: user?.repositoryDiscussionComments?.totalCount ?? 0,
+      lifetimeDiscussions: user?.repositoryDiscussions?.totalCount ?? 0,
+      lifetimeDiscussionComments: user?.repositoryDiscussionComments?.totalCount ?? 0,
     });
   } catch (err) {
     console.error('GitHub discussions error:', err);

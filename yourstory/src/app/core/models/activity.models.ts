@@ -12,8 +12,10 @@ export interface ActivitySummary {
   issues: number;
   pullRequests: number;
   reviews: number;
-  discussions: number;
-  discussionComments: number;
+  /** Lifetime total — GitHub's API does not expose year-scoped discussion counts. */
+  lifetimeDiscussions: number;
+  /** Lifetime total — GitHub's API does not expose year-scoped discussion comment counts. */
+  lifetimeDiscussionComments: number;
   privateContributions: number;
 }
 

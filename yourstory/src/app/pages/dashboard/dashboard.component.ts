@@ -44,12 +44,14 @@ import { YearlyActivity } from '../../core/models/activity.models';
                   <p class="text-xs text-gray-400 mt-1">Reviews</p>
                 </div>
                 <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.discussions }}</p>
+                  <p class="text-3xl font-bold text-white">{{ activity.lifetimeDiscussions }}</p>
                   <p class="text-xs text-gray-400 mt-1">Discussions</p>
+                  <p class="text-xs text-gray-600 mt-0.5">all time</p>
                 </div>
                 <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.discussionComments }}</p>
+                  <p class="text-3xl font-bold text-white">{{ activity.lifetimeDiscussionComments }}</p>
                   <p class="text-xs text-gray-400 mt-1">Comments</p>
+                  <p class="text-xs text-gray-600 mt-0.5">all time</p>
                 </div>
                 @if (activity.privateContributions > 0) {
                   <div class="bg-gray-800 border border-indigo-800 rounded-xl p-4 text-center">
