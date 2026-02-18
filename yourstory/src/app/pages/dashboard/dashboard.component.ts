@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { GitHubService } from '../../core/services/github.service';
@@ -45,12 +45,18 @@ import { ActivitySummary } from '../../core/models/activity.models';
           </button>
         </div>
 
-        <!-- Aggregated career stats -->
+        <!-- Shareable card (captured for download) -->
         @if (aggregatedActivity(); as activity) {
-          <div class="bg-gray-900 rounded-2xl p-6 shadow-lg mb-6">
-            <h3 class="text-xl font-semibold text-indigo-400 mb-4">Career Totals</h3>
+          <div #shareCard class="bg-gray-900 rounded-2xl p-6 shadow-lg mb-4">
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+            <!-- Card header -->
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-indigo-400">Career Totals</h3>
+              <span class="text-xs text-gray-500">commitstory</span>
+            </div>
+
+            <!-- Stats grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
               <div class="bg-gray-800 rounded-xl p-4 text-center">
                 <p class="text-3xl font-bold text-white">{{ activity.commits }}</p>
                 <p class="text-xs text-gray-400 mt-1">Commits</p>
@@ -84,18 +90,36 @@ import { ActivitySummary } from '../../core/models/activity.models';
                 </div>
               }
             </div>
+
+            <!-- Generated story -->
+            @if (generatedStory(); as storyResult) {
+              <div class="border-t border-gray-800 pt-5">
+                <div class="flex items-center gap-3 mb-3">
+                  <span class="bg-indigo-700 text-indigo-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    {{ storyResult.genre }}
+                  </span>
+                  <span class="text-gray-500 text-xs">~3 min read</span>
+                </div>
+                <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
+              </div>
+            }
           </div>
 
-          <!-- Generated story card -->
-          @if (generatedStory(); as storyResult) {
-            <div class="bg-gray-900 rounded-2xl p-6 shadow-lg">
-              <div class="flex items-center gap-3 mb-4">
-                <span class="bg-indigo-700 text-indigo-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                  {{ storyResult.genre }}
-                </span>
-                <span class="text-gray-500 text-xs">~3 min read</span>
-              </div>
-              <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
+          <!-- Download button — shown once results are ready -->
+          @if (generatedStory()) {
+            <div class="flex justify-end">
+              <button
+                class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-700 transition-colors"
+                [disabled]="isDownloading()"
+                (click)="downloadAsImage()"
+              >
+                @if (isDownloading()) {
+                  <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  <span>Saving…</span>
+                } @else {
+                  <span>⬇ Download as Image</span>
+                }
+              </button>
             </div>
           }
         }
@@ -104,6 +128,8 @@ import { ActivitySummary } from '../../core/models/activity.models';
   `,
 })
 export class DashboardComponent {
+  @ViewChild('shareCard') private readonly shareCard!: ElementRef<HTMLElement>;
+
   private readonly githubService = inject(GitHubService);
   protected readonly authService = inject(AuthService);
   private readonly storyService = inject(StoryService);
@@ -112,6 +138,7 @@ export class DashboardComponent {
 
   readonly selectedGenre = signal<string>(GENRES[0] as string);
   readonly isGenerating = signal(false);
+  readonly isDownloading = signal(false);
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
   readonly generatedStory = signal<StoryResponse | null>(null);
 
@@ -132,5 +159,25 @@ export class DashboardComponent {
         this.isGenerating.set(false);
       },
     });
+  }
+
+  async downloadAsImage(): Promise<void> {
+    if (!this.shareCard) return;
+    this.isDownloading.set(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(this.shareCard.nativeElement, {
+        backgroundColor: '#0f172a', // gray-950
+        pixelRatio: 2,              // retina quality
+      });
+      const link = document.createElement('a');
+      link.download = `github-story-${this.generatedStory()?.genre ?? 'career'}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Download failed:', err);
+    } finally {
+      this.isDownloading.set(false);
+    }
   }
 }
