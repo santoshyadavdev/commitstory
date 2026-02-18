@@ -45,8 +45,12 @@ export class AuthService {
    * Calls /api/auth/user to restore session state on app load.
    * Gracefully handles expired or missing sessions.
    * If the user is authenticated and currently on /login, navigates to /dashboard.
+   * No-op during SSR — session cookies are only available in a real browser request.
    */
   async checkSession(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
     try {
       const response = await firstValueFrom(
         this.http.get<{ user: UserProfile }>('/api/auth/user')
