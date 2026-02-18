@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { forkJoin, map, Observable } from 'rxjs';
 import { YearlyActivity } from '../models/activity.models';
 
@@ -26,18 +26,16 @@ export class GitHubService {
    * Fetches commit/issue/PR contributions for a given year.
    */
   getContributions(year: number): Observable<ContributionsResponse> {
-    return this.http.get<ContributionsResponse>(
-      `/api/github/contributions?year=${year}`
-    );
+    const params = new HttpParams().set('year', String(year));
+    return this.http.get<ContributionsResponse>('/api/github/contributions', { params });
   }
 
   /**
    * Fetches discussion activity for a given year.
    */
   getDiscussions(year: number): Observable<DiscussionsResponse> {
-    return this.http.get<DiscussionsResponse>(
-      `/api/github/discussions?year=${year}`
-    );
+    const params = new HttpParams().set('year', String(year));
+    return this.http.get<DiscussionsResponse>('/api/github/discussions', { params });
   }
 
   /**

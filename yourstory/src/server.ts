@@ -17,6 +17,16 @@ const browserDistFolder = resolve(serverDistFolder, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+// Trust the first proxy hop so secure cookies work behind a reverse proxy.
+app.set('trust proxy', 1);
+
+// Fail fast in production when SESSION_SECRET is not configured.
+if (process.env['NODE_ENV'] === 'production' && !process.env['SESSION_SECRET']) {
+  throw new Error(
+    'SESSION_SECRET environment variable must be set in production.'
+  );
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -25,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
  */
 app.use(
   session({
-    secret: process.env['SESSION_SECRET'] || 'dev-secret-change-in-production',
+    secret: process.env['SESSION_SECRET'] as string,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -125,6 +135,17 @@ app.get('/api/auth/github/callback', async (req, res) => {
         Accept: 'application/vnd.github.v3+json',
       },
     });
+
+    if (!userResponse.ok) {
+      console.error(
+        'GitHub profile fetch failed:',
+        userResponse.status,
+        userResponse.statusText
+      );
+      res.redirect('/login?error=profile_fetch_failed');
+      return;
+    }
+
     const userData = (await userResponse.json()) as {
       id: number;
       login: string;

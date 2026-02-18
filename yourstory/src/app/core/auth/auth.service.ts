@@ -1,5 +1,6 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { UserProfile } from '../models/activity.models';
@@ -8,6 +9,7 @@ import { UserProfile } from '../models/activity.models';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly platformId = inject(PLATFORM_ID);
 
   readonly isAuthenticated = signal(false);
   readonly user = signal<UserProfile | null>(null);
@@ -16,9 +18,12 @@ export class AuthService {
 
   /**
    * Redirects the browser to begin the GitHub OAuth flow.
+   * Guarded with isPlatformBrowser to avoid window access during SSR.
    */
   login(): void {
-    window.location.href = '/api/auth/github';
+    if (isPlatformBrowser(this.platformId)) {
+      window.location.href = '/api/auth/github';
+    }
   }
 
   /**
@@ -55,6 +60,7 @@ export class AuthService {
     } catch {
       this.isAuthenticated.set(false);
       this.user.set(null);
+      this.accessToken.set(null);
     }
   }
 
