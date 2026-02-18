@@ -1,13 +1,11 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { NxWelcome } from './nx-welcome';
+import { HeaderComponent } from './layout/header.component';
 
 @Component({
-  imports: [NxWelcome, RouterModule],
+  imports: [HeaderComponent, RouterModule],
   selector: 'app-root',
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {
-  protected title = 'yourstory';
-}
+export class App {}
