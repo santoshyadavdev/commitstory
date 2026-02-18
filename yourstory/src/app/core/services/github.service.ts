@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { forkJoin, map, Observable } from 'rxjs';
-import { YearlyActivity } from '../models/activity.models';
+import { ActivitySummary, YearlyActivity } from '../models/activity.models';
 
 interface ContributionsResponse {
   year: number;
@@ -52,6 +52,31 @@ export class GitHubService {
         pullRequests: contributions.pullRequests,
         reviews: contributions.reviews,
         privateContributions: contributions.privateContributions,
+        lifetimeDiscussions: discussions.lifetimeDiscussions,
+        lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
+      }))
+    );
+  }
+
+  /**
+   * Fetches contributions for the current year and the previous 3 years (4 years total),
+   * then aggregates the numeric fields by summing them.
+   * Discussion counts are included once — they are already lifetime totals.
+   */
+  getAggregatedActivity(): Observable<ActivitySummary> {
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+
+    return forkJoin({
+      contributions: forkJoin(years.map((year) => this.getContributions(year))),
+      discussions: this.getDiscussions(),
+    }).pipe(
+      map(({ contributions, discussions }) => ({
+        commits: contributions.reduce((sum, c) => sum + c.commits, 0),
+        issues: contributions.reduce((sum, c) => sum + c.issues, 0),
+        pullRequests: contributions.reduce((sum, c) => sum + c.pullRequests, 0),
+        reviews: contributions.reduce((sum, c) => sum + c.reviews, 0),
+        privateContributions: contributions.reduce((sum, c) => sum + c.privateContributions, 0),
         lifetimeDiscussions: discussions.lifetimeDiscussions,
         lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
       }))
