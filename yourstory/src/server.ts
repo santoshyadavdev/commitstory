@@ -5,6 +5,7 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import express from 'express';
 import session from 'express-session';
 import { dirname, resolve } from 'node:path';
@@ -24,6 +25,13 @@ app.set('trust proxy', 1);
 if (process.env['NODE_ENV'] === 'production' && !process.env['SESSION_SECRET']) {
   throw new Error(
     'SESSION_SECRET environment variable must be set in production.'
+  );
+}
+
+// Fail fast in production when GOOGLE_AI_API_KEY is not configured.
+if (process.env['NODE_ENV'] === 'production' && !process.env['GOOGLE_AI_API_KEY']) {
+  throw new Error(
+    'GOOGLE_AI_API_KEY environment variable must be set in production.'
   );
 }
 
@@ -350,6 +358,104 @@ app.get('/api/github/discussions', async (req, res) => {
   } catch (err) {
     console.error('GitHub discussions error:', err);
     res.status(500).json({ error: 'Failed to fetch discussions' });
+  }
+});
+
+// ─── Story Generation Endpoint ───────────────────────────────────────────────
+
+/**
+ * POST /api/stories/generate
+ * Accepts GitHub contribution data and generates a movie-style narrative
+ * using Google's Gemini 1.5 Flash-8B model.
+ */
+app.post('/api/stories/generate', async (req, res) => {
+  if (!req.session.accessToken || !req.session.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+
+  const { year, genre, activity } = req.body as {
+    year?: unknown;
+    genre?: unknown;
+    activity?: unknown;
+  };
+
+  if (typeof year !== 'number') {
+    res.status(400).json({ error: 'year must be a number' });
+    return;
+  }
+  if (typeof genre !== 'string' || !genre.trim()) {
+    res.status(400).json({ error: 'genre must be a non-empty string' });
+    return;
+  }
+  if (!activity || typeof activity !== 'object') {
+    res.status(400).json({ error: 'activity must be a contribution data object' });
+    return;
+  }
+
+  const apiKey = process.env['GOOGLE_AI_API_KEY'];
+  if (!apiKey) {
+    res.status(503).json({ error: 'AI story generation is not configured' });
+    return;
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    const username = req.session.user.login;
+    const act = activity as {
+      commits?: number;
+      pullRequests?: number;
+      issues?: number;
+      reviews?: number;
+      lifetimeDiscussions?: number;
+      lifetimeDiscussionComments?: number;
+      privateContributions?: number;
+    };
+
+    const systemInstruction = [
+      `You are a creative writer who transforms GitHub contribution data into engaging ${genre}-style movie narratives.`,
+      `The protagonist is a developer named ${username}.`,
+      `Write a vivid, compelling story in the ${genre} genre about their coding journey in ${year}.`,
+      `Keep the narrative under approximately 500 words (a ~3-minute read).`,
+      `Treat contribution metrics as narrative achievements: commits become acts of creation,`,
+      `pull requests become collaborative quests, issues become challenges overcome,`,
+      `code reviews become mentorship moments, and discussions become community-building events.`,
+      `Do not include any markdown formatting, headers, or bullet points — write flowing prose only.`,
+    ].join(' ');
+
+    const userPrompt = [
+      `Generate a ${genre} movie-style story for ${username}'s GitHub contributions in ${year}.`,
+      `Here are their contribution stats:`,
+      `- Commits: ${act.commits ?? 0}`,
+      `- Pull Requests: ${act.pullRequests ?? 0}`,
+      `- Issues: ${act.issues ?? 0}`,
+      `- Code Reviews: ${act.reviews ?? 0}`,
+      `- Lifetime Discussions: ${act.lifetimeDiscussions ?? 0}`,
+      `- Lifetime Discussion Comments: ${act.lifetimeDiscussionComments ?? 0}`,
+      `- Private Contributions: ${act.privateContributions ?? 0}`,
+      `Weave these metrics into a cohesive, entertaining narrative in the ${genre} style.`,
+    ].join('\n');
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-lite',
+      systemInstruction,
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        maxOutputTokens: 700,
+        temperature: 0.7,
+      },
+    });
+
+    const story = result.response.text();
+
+    res.json({ story, year, genre });
+  } catch (err) {
+    console.error('Story generation error:', err);
+    res.status(500).json({ error: 'Failed to generate story' });
   }
 });
 
