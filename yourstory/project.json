@@ -1,0 +1,80 @@
+{
+  "name": "yourstory",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "app",
+  "sourceRoot": "yourstory/src",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@angular/build:application",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/yourstory",
+        "browser": "yourstory/src/main.ts",
+        "tsConfig": "yourstory/tsconfig.app.json",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "yourstory/public"
+          }
+        ],
+        "styles": ["yourstory/src/styles.css"],
+        "server": "yourstory/src/main.server.ts",
+        "ssr": {
+          "entry": "yourstory/src/server.ts"
+        },
+        "outputMode": "server"
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "500kb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        }
+      },
+      "defaultConfiguration": "production"
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@angular/build:dev-server",
+      "configurations": {
+        "production": {
+          "buildTarget": "yourstory:build:production"
+        },
+        "development": {
+          "buildTarget": "yourstory:build:development"
+        }
+      },
+      "defaultConfiguration": "development"
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "serve-static": {
+      "continuous": true,
+      "executor": "@nx/web:file-server",
+      "options": {
+        "buildTarget": "yourstory:build",
+        "port": 4200,
+        "staticFilePath": "dist/yourstory/browser",
+        "spa": true
+      }
+    }
+  }
+}
