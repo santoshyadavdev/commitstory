@@ -14,6 +14,7 @@ export interface ActivitySummary {
   reviews: number;
   discussions: number;
   discussionComments: number;
+  privateContributions: number;
 }
 
 export interface YearlyActivity extends ActivitySummary {

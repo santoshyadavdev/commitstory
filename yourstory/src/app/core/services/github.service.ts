@@ -9,6 +9,7 @@ interface ContributionsResponse {
   issues: number;
   pullRequests: number;
   reviews: number;
+  privateContributions: number;
 }
 
 interface DiscussionsResponse {
@@ -53,6 +54,7 @@ export class GitHubService {
         issues: contributions.issues,
         pullRequests: contributions.pullRequests,
         reviews: contributions.reviews,
+        privateContributions: contributions.privateContributions,
         discussions: discussions.discussions,
         discussionComments: discussions.discussionComments,
       }))

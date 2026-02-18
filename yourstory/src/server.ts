@@ -207,6 +207,7 @@ app.get('/api/github/contributions', async (req, res) => {
           totalIssueContributions
           totalPullRequestContributions
           totalPullRequestReviewContributions
+          restrictedContributionsCount
         }
       }
     }
@@ -235,6 +236,7 @@ app.get('/api/github/contributions', async (req, res) => {
             totalIssueContributions: number;
             totalPullRequestContributions: number;
             totalPullRequestReviewContributions: number;
+            restrictedContributionsCount: number;
           };
         };
       };
@@ -253,6 +255,7 @@ app.get('/api/github/contributions', async (req, res) => {
       issues: collection?.totalIssueContributions ?? 0,
       pullRequests: collection?.totalPullRequestContributions ?? 0,
       reviews: collection?.totalPullRequestReviewContributions ?? 0,
+      privateContributions: collection?.restrictedContributionsCount ?? 0,
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
