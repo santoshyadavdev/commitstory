@@ -7,11 +7,9 @@ compatibility_flags = ["nodejs_compat"]
 directory = "dist/yourstory/browser"
 binding = "ASSETS"
 
-[vars]
-NODE_ENV = "production"
-
-# Add your secrets via Cloudflare dashboard or `wrangler secret put`:
-# SESSION_SECRET
-# GOOGLE_AI_API_KEY
-# GITHUB_CLIENT_ID
-# GITHUB_CLIENT_SECRET
+# Add secrets via the Cloudflare dashboard or:
+#   wrangler secret put SESSION_SECRET
+#   wrangler secret put GOOGLE_AI_API_KEY
+#   wrangler secret put GITHUB_CLIENT_ID
+#   wrangler secret put GITHUB_CLIENT_SECRET
+#   wrangler secret put GITHUB_CALLBACK_URL

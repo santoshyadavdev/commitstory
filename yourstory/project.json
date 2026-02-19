@@ -46,6 +46,12 @@
           "optimization": false,
           "extractLicenses": false,
           "sourceMap": true
+        },
+        "cloudflare": {
+          "outputHashing": "all",
+          "ssr": {
+            "entry": "yourstory/src/server.workers.ts"
+          }
         }
       },
       "defaultConfiguration": "production"
