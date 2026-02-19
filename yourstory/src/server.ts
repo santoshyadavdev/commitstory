@@ -374,16 +374,11 @@ app.post('/api/stories/generate', async (req, res) => {
     return;
   }
 
-  const { year, genre, activity } = req.body as {
-    year?: unknown;
+  const { genre, activity } = req.body as {
     genre?: unknown;
     activity?: unknown;
   };
 
-  if (typeof year !== 'number') {
-    res.status(400).json({ error: 'year must be a number' });
-    return;
-  }
   if (typeof genre !== 'string' || !genre.trim()) {
     res.status(400).json({ error: 'genre must be a non-empty string' });
     return;
@@ -416,7 +411,7 @@ app.post('/api/stories/generate', async (req, res) => {
     const systemInstruction = [
       `You are a creative writer who transforms GitHub contribution data into engaging ${genre}-style movie narratives.`,
       `The protagonist is a developer named ${username}.`,
-      `Write a vivid, compelling story in the ${genre} genre about their coding journey in ${year}.`,
+      `Write a vivid, compelling story in the ${genre} genre about their GitHub career and coding journey.`,
       `Keep the narrative under approximately 500 words (a ~3-minute read).`,
       `Treat contribution metrics as narrative achievements: commits become acts of creation,`,
       `pull requests become collaborative quests, issues become challenges overcome,`,
@@ -425,8 +420,8 @@ app.post('/api/stories/generate', async (req, res) => {
     ].join(' ');
 
     const userPrompt = [
-      `Generate a ${genre} movie-style story for ${username}'s GitHub contributions in ${year}.`,
-      `Here are their contribution stats:`,
+      `Generate a ${genre} movie-style story for ${username}'s GitHub career totals.`,
+      `Here are their career contribution stats:`,
       `- Commits: ${act.commits ?? 0}`,
       `- Pull Requests: ${act.pullRequests ?? 0}`,
       `- Issues: ${act.issues ?? 0}`,
@@ -452,7 +447,7 @@ app.post('/api/stories/generate', async (req, res) => {
 
     const story = result.response.text();
 
-    res.json({ story, year, genre });
+    res.json({ story, genre, label: 'Career Summary' });
   } catch (err) {
     console.error('Story generation error:', err);
     res.status(500).json({ error: 'Failed to generate story' });
