@@ -133,12 +133,12 @@ const GITHUB_PATH =
               </p>
             </div>
 
-            <!-- Card: 4 Years of Data -->
+            <!-- Card: 10 Years of Data -->
             <div
               class="bg-gray-900/50 backdrop-blur rounded-xl border border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10"
             >
               <div class="text-4xl mb-4" aria-hidden="true">&#128202;</div>
-              <h3 class="font-bold text-lg mb-2 text-white">4 Years of Data</h3>
+              <h3 class="font-bold text-lg mb-2 text-white">Max 10 Years of Data</h3>
               <p class="text-gray-400 text-sm leading-relaxed">
                 Aggregate commits, PRs, issues, and code reviews across your entire history
               </p>
