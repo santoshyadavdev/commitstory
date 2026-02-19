@@ -81,9 +81,9 @@ async function decodeSession(value: string, secret: string): Promise<SessionData
   if (dot === -1) return null;
   const payload = value.slice(0, dot);
   const sigB64 = value.slice(dot + 1);
-  let sigBytes: Uint8Array;
+  let sigBytes: Uint8Array<ArrayBuffer>;
   try {
-    sigBytes = Uint8Array.from(b64urlDecode(sigB64), (c) => c.charCodeAt(0));
+    sigBytes = Uint8Array.from(b64urlDecode(sigB64), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
   } catch {
     return null;
   }
