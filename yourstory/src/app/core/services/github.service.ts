@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { forkJoin, map, Observable } from 'rxjs';
-import { ActivitySummary, YearlyActivity } from '../models/activity.models';
+import { ActivitySummary, RepositoryContribution, YearlyActivity } from '../models/activity.models';
 
 interface ContributionsResponse {
   year: number;
@@ -15,6 +15,11 @@ interface ContributionsResponse {
 interface DiscussionsResponse {
   lifetimeDiscussions: number;
   lifetimeDiscussionComments: number;
+}
+
+interface RepositoryContributionsResponse {
+  year: number;
+  topRepositories: RepositoryContribution[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,6 +40,17 @@ export class GitHubService {
    */
   getDiscussions(): Observable<DiscussionsResponse> {
     return this.http.get<DiscussionsResponse>('/api/github/discussions');
+  }
+
+  /**
+   * Fetches popular repository contributions for a given year.
+   */
+  getRepositoryContributions(year: number): Observable<RepositoryContributionsResponse> {
+    const params = new HttpParams().set('year', String(year));
+    return this.http.get<RepositoryContributionsResponse>(
+      '/api/github/repository-contributions',
+      { params }
+    );
   }
 
   /**
@@ -88,16 +104,38 @@ export class GitHubService {
     return forkJoin({
       contributions: forkJoin(years.map((year) => this.getContributions(year))),
       discussions: this.getDiscussions(),
+      repoContributions: forkJoin(years.map((year) => this.getRepositoryContributions(year))),
     }).pipe(
-      map(({ contributions, discussions }) => ({
-        commits: contributions.reduce((sum, c) => sum + c.commits, 0),
-        issues: contributions.reduce((sum, c) => sum + c.issues, 0),
-        pullRequests: contributions.reduce((sum, c) => sum + c.pullRequests, 0),
-        reviews: contributions.reduce((sum, c) => sum + c.reviews, 0),
-        privateContributions: contributions.reduce((sum, c) => sum + c.privateContributions, 0),
-        lifetimeDiscussions: discussions.lifetimeDiscussions,
-        lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
-      }))
+      map(({ contributions, discussions, repoContributions }) => {
+        // Merge repository contributions across years, deduplicating by nameWithOwner
+        const repoMap = new Map<string, RepositoryContribution>();
+        for (const yearData of repoContributions) {
+          for (const repo of yearData.topRepositories) {
+            const existing = repoMap.get(repo.nameWithOwner);
+            if (existing) {
+              existing.commits += repo.commits;
+              existing.pullRequests += repo.pullRequests;
+              existing.totalContributions += repo.totalContributions;
+            } else {
+              repoMap.set(repo.nameWithOwner, { ...repo });
+            }
+          }
+        }
+        const topRepositories = Array.from(repoMap.values())
+          .sort((a, b) => b.totalContributions - a.totalContributions)
+          .slice(0, 10);
+
+        return {
+          commits: contributions.reduce((sum, c) => sum + c.commits, 0),
+          issues: contributions.reduce((sum, c) => sum + c.issues, 0),
+          pullRequests: contributions.reduce((sum, c) => sum + c.pullRequests, 0),
+          reviews: contributions.reduce((sum, c) => sum + c.reviews, 0),
+          privateContributions: contributions.reduce((sum, c) => sum + c.privateContributions, 0),
+          lifetimeDiscussions: discussions.lifetimeDiscussions,
+          lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
+          topRepositories,
+        };
+      })
     );
   }
 }

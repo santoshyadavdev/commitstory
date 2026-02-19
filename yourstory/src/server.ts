@@ -295,6 +295,172 @@ app.get('/api/github/contributions', async (req, res) => {
 });
 
 /**
+ * TypeScript interface for a single repository contribution entry returned by
+ * the /api/github/repository-contributions endpoint.
+ */
+interface RepositoryContributionEntry {
+  name: string;
+  nameWithOwner: string;
+  url: string;
+  stargazerCount: number;
+  commits: number;
+  pullRequests: number;
+  totalContributions: number;
+}
+
+/**
+ * GET /api/github/repository-contributions?year=2024
+ * Fetches commit and PR contributions grouped by repository for a given year,
+ * filters to popular repositories (stargazerCount > 100), and returns the
+ * top 10 ranked by total contribution count.
+ */
+app.get('/api/github/repository-contributions', async (req, res) => {
+  if (!req.session.accessToken || !req.session.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+
+  const year =
+    parseInt(req.query['year'] as string) || new Date().getFullYear();
+  const login = req.session.user.login;
+
+  const from = `${year}-01-01T00:00:00Z`;
+  const to = `${year}-12-31T23:59:59Z`;
+
+  const query = `
+    query($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
+          commitContributionsByRepository(maxRepositories: 100) {
+            contributions {
+              totalCount
+            }
+            repository {
+              name
+              nameWithOwner
+              url
+              stargazerCount
+            }
+          }
+          pullRequestContributionsByRepository(maxRepositories: 100) {
+            contributions {
+              totalCount
+            }
+            repository {
+              name
+              nameWithOwner
+              url
+              stargazerCount
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${req.session.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables: { login, from, to } }),
+    });
+
+    if (!response.ok) {
+      res.status(response.status).json({ error: 'GitHub API error' });
+      return;
+    }
+
+    type RepoContribNode = {
+      contributions: { totalCount: number };
+      repository: {
+        name: string;
+        nameWithOwner: string;
+        url: string;
+        stargazerCount: number;
+      };
+    };
+
+    const data = (await response.json()) as {
+      data?: {
+        user?: {
+          contributionsCollection?: {
+            commitContributionsByRepository: RepoContribNode[];
+            pullRequestContributionsByRepository: RepoContribNode[];
+          };
+        };
+      };
+      errors?: { message: string }[];
+    };
+
+    if (data.errors?.length) {
+      res.status(400).json({ error: data.errors[0].message });
+      return;
+    }
+
+    const collection = data.data?.user?.contributionsCollection;
+    const commitsByRepo = collection?.commitContributionsByRepository ?? [];
+    const prsByRepo = collection?.pullRequestContributionsByRepository ?? [];
+
+    // Accumulate per-repository totals in a Map keyed by nameWithOwner
+    const repoMap = new Map<string, RepositoryContributionEntry>();
+
+    for (const node of commitsByRepo) {
+      const { name, nameWithOwner, url, stargazerCount } = node.repository;
+      const existing = repoMap.get(nameWithOwner);
+      const commits = node.contributions.totalCount;
+      if (existing) {
+        existing.commits += commits;
+        existing.totalContributions += commits;
+      } else {
+        repoMap.set(nameWithOwner, {
+          name,
+          nameWithOwner,
+          url,
+          stargazerCount,
+          commits,
+          pullRequests: 0,
+          totalContributions: commits,
+        });
+      }
+    }
+
+    for (const node of prsByRepo) {
+      const { name, nameWithOwner, url, stargazerCount } = node.repository;
+      const existing = repoMap.get(nameWithOwner);
+      const prs = node.contributions.totalCount;
+      if (existing) {
+        existing.pullRequests += prs;
+        existing.totalContributions += prs;
+      } else {
+        repoMap.set(nameWithOwner, {
+          name,
+          nameWithOwner,
+          url,
+          stargazerCount,
+          commits: 0,
+          pullRequests: prs,
+          totalContributions: prs,
+        });
+      }
+    }
+
+    // Filter to popular repos, sort by total contributions descending, top 10
+    const topRepositories = Array.from(repoMap.values())
+      .filter((r) => r.stargazerCount > 100)
+      .sort((a, b) => b.totalContributions - a.totalContributions)
+      .slice(0, 10);
+
+    res.json({ year, topRepositories });
+  } catch (err) {
+    console.error('GitHub repository-contributions error:', err);
+    res.status(500).json({ error: 'Failed to fetch repository contributions' });
+  }
+});
+
+/**
  * GET /api/github/discussions?year=2024
  * Fetches the authenticated user's discussion contributions for a given year.
  */
@@ -376,10 +542,19 @@ app.post('/api/stories/generate', async (req, res) => {
     return;
   }
 
-  const { genre, activity, createdAt } = req.body as {
+  const { genre, activity, createdAt, topRepositories } = req.body as {
     genre?: unknown;
     activity?: unknown;
     createdAt?: string;
+    topRepositories?: Array<{
+      name: string;
+      nameWithOwner: string;
+      url: string;
+      stargazerCount: number;
+      commits: number;
+      pullRequests: number;
+      totalContributions: number;
+    }>;
   };
 
   if (typeof genre !== 'string' || !genre.trim()) {
@@ -436,6 +611,9 @@ app.post('/api/stories/generate', async (req, res) => {
       `Treat contribution metrics as narrative achievements: commits become acts of creation,`,
       `pull requests become collaborative quests, issues become challenges overcome,`,
       `code reviews become mentorship moments, and discussions become community-building events.`,
+      `When repository data is provided, weave contributions to popular open-source projects into the narrative —`,
+      `treat them as legendary quests or epic collaborations with the wider developer community.`,
+      `Naturally mention 2-3 notable repositories without forcing all of them into the story.`,
       `Do not include any markdown formatting, headers, or bullet points — write flowing prose only.`,
     ].join(' ');
 
@@ -452,6 +630,16 @@ app.post('/api/stories/generate', async (req, res) => {
       `- Lifetime Discussion Comments: ${act.lifetimeDiscussionComments ?? 0}`,
       `- Private Contributions: ${act.privateContributions ?? 0}`,
       `Weave these metrics into a cohesive, entertaining narrative in the ${genre} style.`,
+      ...(topRepositories && topRepositories.length > 0
+        ? [
+            `\nTop repositories contributed to:`,
+            ...topRepositories.slice(0, 10).map(
+              (r) =>
+                `- ${r.nameWithOwner} (⭐ ${r.stargazerCount.toLocaleString()}, ${r.totalContributions} contribution${r.totalContributions !== 1 ? 's' : ''})`
+            ),
+            `Naturally mention 2-3 of these notable projects to enrich the story.`,
+          ]
+        : []),
     ].join('\n');
 
     const model = genAI.getGenerativeModel({
