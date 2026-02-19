@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string | null;
   avatar_url: string;
   html_url: string;
+  created_at?: string;
 }
 
 export interface ActivitySummary {

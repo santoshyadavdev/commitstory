@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { GitHubService } from '../../core/services/github.service';
@@ -15,7 +15,7 @@ import { ActivitySummary } from '../../core/models/activity.models';
       <div class="max-w-5xl mx-auto">
         <h2 class="text-3xl font-bold mb-4">Your GitHub Story</h2>
         <p class="text-gray-400 mb-8">
-          Generate a career-spanning story based on your GitHub contributions across the last 4 years.
+          Generate a career-spanning story based on your GitHub contributions since you joined.
           Choose a genre and let AI craft your unique developer narrative.
         </p>
 
@@ -83,6 +83,12 @@ import { ActivitySummary } from '../../core/models/activity.models';
                 <p class="text-xs text-gray-400 mt-1">Comments</p>
                 <p class="text-xs text-gray-600 mt-0.5">all time</p>
               </div>
+              @if (memberSinceYear(); as sinceYear) {
+                <div class="bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-indigo-300">{{ sinceYear }}</p>
+                  <p class="text-xs text-gray-400 mt-1">Member since</p>
+                </div>
+              }
               @if (activity.privateContributions > 0) {
                 <div class="bg-gray-800 border border-indigo-800 rounded-xl p-4 text-center">
                   <p class="text-3xl font-bold text-indigo-400">{{ activity.privateContributions }}</p>
@@ -141,14 +147,27 @@ export class DashboardComponent {
   readonly isDownloading = signal(false);
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
   readonly generatedStory = signal<StoryResponse | null>(null);
+  readonly memberSinceYear = signal<number | null>(null);
+
+  constructor() {
+    // Eagerly derive the "Member since" year from the authenticated user profile.
+    effect(() => {
+      const createdAt = this.authService.user()?.created_at;
+      if (createdAt) {
+        this.memberSinceYear.set(new Date(createdAt).getFullYear());
+      }
+    });
+  }
 
   onGenerateStory(): void {
     this.isGenerating.set(true);
 
-    this.githubService.getAggregatedActivity().pipe(
+    const createdAt = this.authService.user()?.created_at;
+
+    this.githubService.getAggregatedActivity(createdAt).pipe(
       switchMap((activity) => {
         this.aggregatedActivity.set(activity);
-        return this.storyService.generateStory(this.selectedGenre(), activity);
+        return this.storyService.generateStory(this.selectedGenre(), activity, createdAt);
       })
     ).subscribe({
       next: (result) => {

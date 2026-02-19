@@ -9,6 +9,7 @@ declare module 'express-session' {
       email: string | null;
       avatar_url: string;
       html_url: string;
+      created_at?: string;
     };
     accessToken?: string;
     oauthState?: string;
