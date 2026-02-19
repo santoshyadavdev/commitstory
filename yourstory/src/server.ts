@@ -169,7 +169,7 @@ async function handleGitHubAuth(
   const params = new URLSearchParams({
     client_id: env.GITHUB_CLIENT_ID,
     redirect_uri: env.GITHUB_CALLBACK_URL,
-    scope: 'read:user repo read:discussion',
+    scope: 'read:user read:discussion',
     state,
   });
 
