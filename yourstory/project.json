@@ -22,7 +22,8 @@
         "styles": ["yourstory/src/styles.css"],
         "server": "yourstory/src/main.server.ts",
         "ssr": {
-          "entry": "yourstory/src/server.workers.ts"
+          "entry": "yourstory/src/server.ts",
+           "experimentalPlatform": "neutral"
         },
         "outputMode": "server"
       },
@@ -50,7 +51,7 @@
         "cloudflare": {
           "outputHashing": "all",
           "ssr": {
-            "entry": "yourstory/src/server.workers.ts"
+            "entry": "yourstory/src/server.ts"
           }
         }
       },
