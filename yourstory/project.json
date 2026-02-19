@@ -51,7 +51,8 @@
         "cloudflare": {
           "outputHashing": "all",
           "ssr": {
-            "entry": "yourstory/src/server.ts"
+            "entry": "yourstory/src/server.ts",
+            "experimentalPlatform": "neutral"
           }
         }
       },
