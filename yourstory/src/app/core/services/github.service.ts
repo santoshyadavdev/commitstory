@@ -59,13 +59,31 @@ export class GitHubService {
   }
 
   /**
-   * Fetches contributions for the current year and the previous 3 years (4 years total),
-   * then aggregates the numeric fields by summing them.
+   * Fetches contributions from the user's account creation year to the current year,
+   * capped at a maximum of 10 years, then aggregates the numeric fields by summing them.
    * Discussion counts are included once — they are already lifetime totals.
+   *
+   * @param createdAt - ISO 8601 date string of the GitHub account creation date.
+   *                    Falls back to the last 4 years when not provided.
    */
-  getAggregatedActivity(): Observable<ActivitySummary> {
+  getAggregatedActivity(createdAt?: string): Observable<ActivitySummary> {
     const currentYear = new Date().getFullYear();
-    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+    const MAX_YEARS = 10;
+
+    let startYear: number;
+    if (createdAt) {
+      const creationYear = new Date(createdAt).getFullYear();
+      // Clamp to at most MAX_YEARS in the past
+      startYear = Math.max(creationYear, currentYear - MAX_YEARS + 1);
+    } else {
+      // Fallback: last 4 years (original behaviour)
+      startYear = currentYear - 3;
+    }
+
+    const years: number[] = [];
+    for (let y = startYear; y <= currentYear; y++) {
+      years.push(y);
+    }
 
     return forkJoin({
       contributions: forkJoin(years.map((year) => this.getContributions(year))),

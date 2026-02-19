@@ -225,7 +225,7 @@ const GITHUB_PATH =
               <div class="text-3xl mb-3" aria-hidden="true">&#128200;</div>
               <h3 class="font-bold text-xl mb-2 text-white">View Your Stats</h3>
               <p class="text-gray-400 text-sm leading-relaxed">
-                Explore your last 4 years of commits, pull requests, issues, and code reviews at a glance
+                Explore your entire GitHub journey — commits, pull requests, issues, and code reviews — all in one place
               </p>
             </div>
 

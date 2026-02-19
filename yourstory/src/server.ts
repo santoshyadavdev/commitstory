@@ -161,6 +161,7 @@ app.get('/api/auth/github/callback', async (req, res) => {
       email: string | null;
       avatar_url: string;
       html_url: string;
+      created_at: string;
     };
 
     req.session.accessToken = tokenData.access_token;
@@ -171,6 +172,7 @@ app.get('/api/auth/github/callback', async (req, res) => {
       email: userData.email,
       avatar_url: userData.avatar_url,
       html_url: userData.html_url,
+      created_at: userData.created_at,
     };
 
     res.redirect('/dashboard');
@@ -374,9 +376,10 @@ app.post('/api/stories/generate', async (req, res) => {
     return;
   }
 
-  const { genre, activity } = req.body as {
+  const { genre, activity, createdAt } = req.body as {
     genre?: unknown;
     activity?: unknown;
+    createdAt?: string;
   };
 
   if (typeof genre !== 'string' || !genre.trim()) {
@@ -398,6 +401,21 @@ app.post('/api/stories/generate', async (req, res) => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const username = req.session.user.login;
+
+    // Calculate account age for the AI prompt
+    const memberSince = createdAt ?? req.session.user.created_at;
+    let accountAgeText = '';
+    if (memberSince) {
+      const creationYear = new Date(memberSince).getFullYear();
+      const currentYear = new Date().getFullYear();
+      const yearsOnGitHub = currentYear - creationYear;
+      accountAgeText = yearsOnGitHub > 0
+        ? `a developer who has been on their coding journey for ${yearsOnGitHub} year${yearsOnGitHub !== 1 ? 's' : ''} since ${creationYear}`
+        : `a developer who joined GitHub in ${creationYear}`;
+    } else {
+      accountAgeText = 'a passionate developer';
+    }
+
     const act = activity as {
       commits?: number;
       pullRequests?: number;
@@ -410,8 +428,10 @@ app.post('/api/stories/generate', async (req, res) => {
 
     const systemInstruction = [
       `You are a creative writer who transforms GitHub contribution data into engaging ${genre}-style movie narratives.`,
-      `The protagonist is a developer named ${username}.`,
+      `The protagonist is ${accountAgeText} named ${username}.`,
       `Write a vivid, compelling story in the ${genre} genre about their GitHub career and coding journey.`,
+      `Their journey began in ${memberSince ? new Date(memberSince).getFullYear() : 'the past'} — weave this origin into the narrative.`,
+      `Mention when they started their coding adventure to give the story a sense of time and growth.`,
       `Keep the narrative under approximately 500 words (a ~3-minute read).`,
       `Treat contribution metrics as narrative achievements: commits become acts of creation,`,
       `pull requests become collaborative quests, issues become challenges overcome,`,
@@ -421,7 +441,9 @@ app.post('/api/stories/generate', async (req, res) => {
 
     const userPrompt = [
       `Generate a ${genre} movie-style story for ${username}'s GitHub career totals.`,
+      `${accountAgeText.charAt(0).toUpperCase() + accountAgeText.slice(1)}, they joined GitHub in ${memberSince ? new Date(memberSince).getFullYear() : 'the past'}.`,
       `Here are their career contribution stats:`,
+      `- Member since: ${memberSince ? new Date(memberSince).getFullYear() : 'unknown'}`,
       `- Commits: ${act.commits ?? 0}`,
       `- Pull Requests: ${act.pullRequests ?? 0}`,
       `- Issues: ${act.issues ?? 0}`,
