@@ -226,6 +226,7 @@ async function handleGitHubCallback(
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`,
       Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'commitstory-app',
     },
   });
 
@@ -306,6 +307,7 @@ async function handleContributions(request: Request, session: SessionData): Prom
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'commitstory-app',
       },
       body: JSON.stringify({ query, variables: { login: session.user.login, from, to } }),
     });
@@ -382,6 +384,7 @@ async function handleRepositoryContributions(
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'commitstory-app',
       },
       body: JSON.stringify({ query, variables: { login: session.user.login, from, to } }),
     });
@@ -483,6 +486,7 @@ async function handleDiscussions(request: Request, session: SessionData): Promis
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'commitstory-app',
       },
       body: JSON.stringify({ query, variables: { login } }),
     });
