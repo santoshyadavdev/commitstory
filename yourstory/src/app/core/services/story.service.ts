@@ -1,13 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ActivitySummary } from '../models/activity.models';
+import { ActivitySummary, RepositoryContribution } from '../models/activity.models';
 
 export interface StoryRequest {
   genre: string;
   activity: ActivitySummary;
   year?: number;
   createdAt?: string;
+  topRepositories?: RepositoryContribution[];
 }
 
 export interface StoryResponse {
@@ -37,9 +38,10 @@ export class StoryService {
   generateStory(
     genre: string,
     activity: ActivitySummary,
-    createdAt?: string
+    createdAt?: string,
+    topRepositories?: RepositoryContribution[]
   ): Observable<StoryResponse> {
-    const body: StoryRequest = { genre, activity, createdAt };
+    const body: StoryRequest = { genre, activity, createdAt, topRepositories };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
   }
 }

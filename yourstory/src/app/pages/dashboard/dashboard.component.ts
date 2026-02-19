@@ -167,7 +167,12 @@ export class DashboardComponent {
     this.githubService.getAggregatedActivity(createdAt).pipe(
       switchMap((activity) => {
         this.aggregatedActivity.set(activity);
-        return this.storyService.generateStory(this.selectedGenre(), activity, createdAt);
+        return this.storyService.generateStory(
+          this.selectedGenre(),
+          activity,
+          createdAt,
+          activity.topRepositories
+        );
       })
     ).subscribe({
       next: (result) => {
