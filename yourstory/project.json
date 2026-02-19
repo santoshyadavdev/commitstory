@@ -22,7 +22,7 @@
         "styles": ["yourstory/src/styles.css"],
         "server": "yourstory/src/main.server.ts",
         "ssr": {
-          "entry": "yourstory/src/server.ts"
+          "entry": "yourstory/src/server.workers.ts"
         },
         "outputMode": "server"
       },
