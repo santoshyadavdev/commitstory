@@ -362,8 +362,6 @@ async function handleContributions(request: Request, session: SessionData): Prom
         const message = error.message?.toLowerCase() ?? '';
         return (
           error.extensions?.saml_failure === true ||
-          error.type === 'FORBIDDEN' ||
-          error.extensions?.type === 'FORBIDDEN' ||
           message.includes('saml enforcement') ||
           message.includes('organization saml')
         );
@@ -377,24 +375,40 @@ async function handleContributions(request: Request, session: SessionData): Prom
 
       // Retry without restrictedContributionsCount so we can still return public totals.
       const fallbackResponse = await requestGraphQL(queryWithoutPrivateContributions);
-      if (fallbackResponse.ok) {
-        const fallbackData = (await fallbackResponse.json()) as {
-          data?: {
-            user?: {
-              contributionsCollection?: ContributionsCollection;
-            };
-          };
-          errors?: Array<{
-            message: string;
-            type?: string;
-            extensions?: {
-              saml_failure?: boolean;
-              type?: string;
-            };
-          }>;
-        };
-        c = fallbackData.data?.user?.contributionsCollection ?? c;
+      if (!fallbackResponse.ok) {
+        let fallbackError = 'GitHub API error';
+        try {
+          const errorBody = (await fallbackResponse.json()) as { message?: string };
+          if (typeof errorBody.message === 'string' && errorBody.message.trim()) {
+            fallbackError = errorBody.message;
+          }
+        } catch {
+          // Ignore body parse issues and keep generic fallbackError.
+        }
+        return json({ error: fallbackError }, fallbackResponse.status);
       }
+
+      const fallbackData = (await fallbackResponse.json()) as {
+        data?: {
+          user?: {
+            contributionsCollection?: ContributionsCollection;
+          };
+        };
+        errors?: Array<{
+          message: string;
+          type?: string;
+          extensions?: {
+            saml_failure?: boolean;
+            type?: string;
+          };
+        }>;
+      };
+
+      if (fallbackData.errors?.length) {
+        return json({ error: fallbackData.errors.map((error) => error.message).join('; ') }, 400);
+      }
+
+      c = fallbackData.data?.user?.contributionsCollection ?? c;
     }
 
     return json({
