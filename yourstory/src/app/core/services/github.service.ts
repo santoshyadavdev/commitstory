@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { forkJoin, map, Observable } from 'rxjs';
-import { ActivitySummary, RepositoryContribution, YearlyActivity } from '../models/activity.models';
+import { catchError, forkJoin, map, Observable, of } from 'rxjs';
+import { ActivitySummary, RepositoryContribution, TimelineData, YearlyActivity } from '../models/activity.models';
 
 interface ContributionsResponse {
   year: number;
@@ -50,6 +50,24 @@ export class GitHubService {
     return this.http.get<RepositoryContributionsResponse>(
       '/api/github/repository-contributions',
       { params }
+    );
+  }
+
+  /**
+   * Fetches timeline milestone data used by the dashboard timeline view.
+   */
+  getMilestones(): Observable<TimelineData> {
+    return this.http.post<TimelineData>('/api/github/milestones', {}).pipe(
+      catchError(() =>
+        of({
+          username: '',
+          totalPullRequests: 0,
+          totalCommits: 0,
+          totalIssues: 0,
+          totalDiscussions: 0,
+          events: [],
+        })
+      )
     );
   }
 
