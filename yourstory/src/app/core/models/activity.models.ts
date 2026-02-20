@@ -27,7 +27,6 @@ export interface ActivitySummary {
   lifetimeDiscussions: number;
   /** Lifetime total — GitHub's API does not expose year-scoped discussion comment counts. */
   lifetimeDiscussionComments: number;
-  privateContributions: number;
   /** Top popular repositories contributed to, merged across all fetched years. */
   topRepositories?: RepositoryContribution[];
 }

@@ -103,12 +103,6 @@ import { ActivitySummary } from '../../core/models/activity.models';
                   <p class="text-xs text-gray-400 mt-1">Member since</p>
                 </div>
               }
-              @if (activity.privateContributions > 0) {
-                <div class="bg-gray-800 border border-indigo-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-indigo-400">{{ activity.privateContributions }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Private</p>
-                </div>
-              }
             </div>
 
             <!-- Generated story -->
