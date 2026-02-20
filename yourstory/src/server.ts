@@ -528,8 +528,9 @@ async function handleGenerateStory(
     return json({ error: 'Not authenticated' }, 401);
   }
 
-  const { genre, activity, createdAt, topRepositories } = (await request.json()) as {
+  const { genre, language, activity, createdAt, topRepositories } = (await request.json()) as {
     genre?: unknown;
+    language?: unknown;
     activity?: unknown;
     createdAt?: string;
     topRepositories?: Array<{
@@ -545,6 +546,10 @@ async function handleGenerateStory(
 
   if (typeof genre !== 'string' || !genre.trim()) {
     return json({ error: 'genre must be a non-empty string' }, 400);
+  }
+  const selectedLanguage = typeof language === 'string' && language.trim() ? language : 'English';
+  if (!['English', 'Hindi'].includes(selectedLanguage)) {
+    return json({ error: "language must be either 'English' or 'Hindi'" }, 400);
   }
   if (!activity || typeof activity !== 'object') {
     return json({ error: 'activity must be a contribution data object' }, 400);
@@ -584,7 +589,7 @@ async function handleGenerateStory(
     const systemInstruction = [
       `You are a creative writer who transforms GitHub contribution data into engaging ${genre}-style movie narratives.`,
       `The protagonist is ${accountAgeText} named ${username}.`,
-      `Write a vivid, compelling story in the ${genre} genre about their GitHub career and coding journey.`,
+      `Generate both a compelling title and a vivid story in the ${genre} genre about their GitHub career and coding journey.`,
       `Their journey began in ${memberSince ? new Date(memberSince).getFullYear() : 'the past'} — weave this origin into the narrative.`,
       `Mention when they started their coding adventure to give the story a sense of time and growth.`,
       `Keep the narrative under approximately 500 words (a ~3-minute read).`,
@@ -594,11 +599,14 @@ async function handleGenerateStory(
       `When repository data is provided, weave contributions to popular open-source projects into the narrative —`,
       `treat them as legendary quests or epic collaborations with the wider developer community.`,
       `Naturally mention 2-3 notable repositories without forcing all of them into the story.`,
-      `Do not include any markdown formatting, headers, or bullet points — write flowing prose only.`,
+      `Write everything in ${selectedLanguage}.`,
+      `Return output in this exact plain-text structure: TITLE: [title]\\nSTORY: [story content].`,
+      `Do not include markdown formatting, extra headings, or bullet points outside this structure.`,
     ].join(' ');
 
     const userPrompt = [
       `Generate a ${genre} movie-style story for ${username}'s GitHub career totals.`,
+      `Language: ${selectedLanguage}.`,
       `${accountAgeText.charAt(0).toUpperCase() + accountAgeText.slice(1)}, they joined GitHub in ${memberSince ? new Date(memberSince).getFullYear() : 'the past'}.`,
       `Here are their career contribution stats:`,
       `- Member since: ${memberSince ? new Date(memberSince).getFullYear() : 'unknown'}`,
@@ -610,6 +618,10 @@ async function handleGenerateStory(
       `- Lifetime Discussion Comments: ${act.lifetimeDiscussionComments ?? 0}`,
       `- Private Contributions: ${act.privateContributions ?? 0}`,
       `Weave these metrics into a cohesive, entertaining narrative in the ${genre} style.`,
+      `Output both title and story in ${selectedLanguage}.`,
+      `Respond exactly in this format:`,
+      `TITLE: [title]`,
+      `STORY: [story content]`,
       ...(topRepositories?.length
         ? [
             `\nTop repositories contributed to:`,
@@ -632,7 +644,15 @@ async function handleGenerateStory(
       generationConfig: { maxOutputTokens: 700, temperature: 0.7 },
     });
 
-    return json({ story: result.response.text(), genre, label: 'Career Summary' });
+    const rawResponse = result.response.text().trim();
+    const titleAndStoryMatch = rawResponse.match(/TITLE:\s*([\s\S]*?)\nSTORY:\s*([\s\S]*)/i);
+
+    const fallbackTitle =
+      selectedLanguage === 'Hindi' ? 'कोडिंग यात्रा की कहानी' : 'A Developer Journey';
+    const parsedTitle = titleAndStoryMatch?.[1]?.trim() || fallbackTitle;
+    const parsedStory = titleAndStoryMatch?.[2]?.trim() || rawResponse;
+
+    return json({ title: parsedTitle, story: parsedStory, genre, label: 'Career Summary' });
   } catch (err) {
     console.error('Story generation error:', err);
     return json({ error: 'Failed to generate story' }, 500);

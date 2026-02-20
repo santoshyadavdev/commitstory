@@ -5,6 +5,7 @@ import { ActivitySummary, RepositoryContribution } from '../models/activity.mode
 
 export interface StoryRequest {
   genre: string;
+  language?: string;
   activity: ActivitySummary;
   year?: number;
   createdAt?: string;
@@ -12,6 +13,7 @@ export interface StoryRequest {
 }
 
 export interface StoryResponse {
+  title: string;
   story: string;
   genre: string;
   year?: number;
@@ -28,6 +30,8 @@ export const GENRES = [
   'Sports',
 ] as const;
 
+export const LANGUAGES = ['English', 'Hindi'] as const;
+
 @Injectable({ providedIn: 'root' })
 export class StoryService {
   private readonly http = inject(HttpClient);
@@ -37,11 +41,12 @@ export class StoryService {
    */
   generateStory(
     genre: string,
+    language: string,
     activity: ActivitySummary,
     createdAt?: string,
     topRepositories?: RepositoryContribution[]
   ): Observable<StoryResponse> {
-    const body: StoryRequest = { genre, activity, createdAt, topRepositories };
+    const body: StoryRequest = { genre, language, activity, createdAt, topRepositories };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
   }
 }

@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { GitHubService } from '../../core/services/github.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { StoryService, StoryResponse, GENRES } from '../../core/services/story.service';
+import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
 import { ActivitySummary } from '../../core/models/activity.models';
 
 @Component({
@@ -19,15 +19,29 @@ import { ActivitySummary } from '../../core/models/activity.models';
           Choose a genre and let AI craft your unique developer narrative.
         </p>
 
-        <!-- Genre selector + generate button -->
+        <!-- Genre/language selectors + generate button -->
         <div class="flex flex-wrap items-center gap-3 mb-8">
+          <label class="text-xs text-gray-400" for="story-genre">Story Genre</label>
           <select
+            id="story-genre"
             class="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             [ngModel]="selectedGenre()"
             (ngModelChange)="selectedGenre.set($event)"
           >
             @for (genre of genres; track genre) {
               <option [value]="genre">{{ genre }}</option>
+            }
+          </select>
+
+          <label class="text-xs text-gray-400" for="story-language">Story Language</label>
+          <select
+            id="story-language"
+            class="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            [ngModel]="selectedLanguage()"
+            (ngModelChange)="selectedLanguage.set($event)"
+          >
+            @for (language of languages; track language) {
+              <option [value]="language">{{ language }}</option>
             }
           </select>
 
@@ -106,7 +120,9 @@ import { ActivitySummary } from '../../core/models/activity.models';
                   </span>
                   <span class="text-gray-500 text-xs">~3 min read</span>
                 </div>
+                <h4 class="text-2xl font-bold text-white mb-3">{{ storyResult.title }}</h4>
                 <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
+                <p class="text-gray-500 text-xs mt-4">Produced by CodeRabbit</p>
               </div>
             }
           </div>
@@ -141,8 +157,10 @@ export class DashboardComponent {
   private readonly storyService = inject(StoryService);
 
   readonly genres = GENRES;
+  readonly languages = LANGUAGES;
 
   readonly selectedGenre = signal<string>(GENRES[0] as string);
+  readonly selectedLanguage = signal<string>(LANGUAGES[0] as string);
   readonly isGenerating = signal(false);
   readonly isDownloading = signal(false);
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
@@ -169,6 +187,7 @@ export class DashboardComponent {
         this.aggregatedActivity.set(activity);
         return this.storyService.generateStory(
           this.selectedGenre(),
+          this.selectedLanguage(),
           activity,
           createdAt,
           activity.topRepositories
