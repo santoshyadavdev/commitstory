@@ -35,3 +35,30 @@ export interface ActivitySummary {
 export interface YearlyActivity extends ActivitySummary {
   year: number;
 }
+
+export enum MilestoneType {
+  account_created = 'account_created',
+  first_pr = 'first_pr',
+  first_issue = 'first_issue',
+  first_discussion = 'first_discussion',
+  pr_count = 'pr_count',
+  commit_count = 'commit_count',
+}
+
+export interface MilestoneEvent {
+  type: MilestoneType;
+  title: string;
+  description: string;
+  date: string | null;
+  count?: number;
+  url?: string;
+}
+
+export interface TimelineData {
+  username: string;
+  totalPullRequests: number;
+  totalCommits: number;
+  totalIssues: number;
+  totalDiscussions: number;
+  events: MilestoneEvent[];
+}

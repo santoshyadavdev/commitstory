@@ -597,6 +597,296 @@ async function handleDiscussions(request: Request, session: SessionData): Promis
 }
 
 /**
+ * POST /api/github/milestones
+ */
+async function handleMilestones(request: Request, session: SessionData): Promise<Response> {
+  if (!session.accessToken || !session.user) {
+    return json({ error: 'Not authenticated' }, 401);
+  }
+
+  void request;
+  const login = session.user.login;
+  const accessToken = session.accessToken;
+  const accountCreatedAt = session.user.created_at ?? null;
+
+  type GraphQLError = { message: string };
+  type MilestoneEvent = {
+    type: 'account_created' | 'first_pr' | 'first_issue' | 'first_discussion' | 'pr_count' | 'commit_count';
+    title: string;
+    description: string;
+    date: string | null;
+    count?: number;
+    url?: string;
+  };
+
+  const buildMilestoneThresholds = (total: number): number[] => {
+    const base = [100, 500, 1000, 2000];
+    const out = base.filter((value) => value <= total);
+    let next = 4000;
+    while (next <= total) {
+      out.push(next);
+      next *= 2;
+    }
+    return out;
+  };
+
+  const requestGraphQL = async <T>(
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<{ data?: T; errors?: GraphQLError[] }> => {
+    const response = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'commitstory-app',
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'GitHub API error';
+      try {
+        const body = (await response.json()) as { message?: string };
+        if (typeof body.message === 'string' && body.message.trim()) {
+          errorMessage = body.message;
+        }
+      } catch {
+        // Ignore parse failure and keep generic message.
+      }
+      throw new Error(`${response.status}:${errorMessage}`);
+    }
+
+    return (await response.json()) as { data?: T; errors?: GraphQLError[] };
+  };
+
+  try {
+    const firstPrSearch = `is:pr author:${login} sort:created-asc`;
+    const firstIssueSearch = `is:issue author:${login} sort:created-asc`;
+
+    const summaryQuery = `
+      query($login: String!, $firstPrQuery: String!, $firstIssueQuery: String!) {
+        user(login: $login) {
+          repositoryDiscussions(first: 1, orderBy: { field: CREATED_AT, direction: ASC }) {
+            totalCount
+            nodes { title url createdAt }
+          }
+        }
+        firstPr: search(query: $firstPrQuery, type: ISSUE, first: 1) {
+          issueCount
+          nodes { ... on PullRequest { title url createdAt } }
+        }
+        firstIssue: search(query: $firstIssueQuery, type: ISSUE, first: 1) {
+          issueCount
+          nodes { ... on Issue { title url createdAt } }
+        }
+      }
+    `;
+
+    const summaryResult = await requestGraphQL<{
+      user?: {
+        repositoryDiscussions?: {
+          totalCount: number;
+          nodes: Array<{ title: string; url: string; createdAt: string }>;
+        };
+      };
+      firstPr?: {
+        issueCount: number;
+        nodes: Array<{ title: string; url: string; createdAt: string }>;
+      };
+      firstIssue?: {
+        issueCount: number;
+        nodes: Array<{ title: string; url: string; createdAt: string }>;
+      };
+    }>(summaryQuery, {
+      login,
+      firstPrQuery: firstPrSearch,
+      firstIssueQuery: firstIssueSearch,
+    });
+
+    if (summaryResult.errors?.length) {
+      return json({ error: summaryResult.errors[0].message }, 400);
+    }
+
+    const totalPullRequests = summaryResult.data?.firstPr?.issueCount ?? 0;
+    const totalIssues = summaryResult.data?.firstIssue?.issueCount ?? 0;
+    const totalDiscussions = summaryResult.data?.user?.repositoryDiscussions?.totalCount ?? 0;
+
+    const firstPrNode = summaryResult.data?.firstPr?.nodes?.[0];
+    const firstIssueNode = summaryResult.data?.firstIssue?.nodes?.[0];
+    const firstDiscussionNode = summaryResult.data?.user?.repositoryDiscussions?.nodes?.[0];
+
+    const events: MilestoneEvent[] = [
+      {
+        type: 'account_created',
+        title: 'GitHub Account Created',
+        description: `${login} joined GitHub and started their developer timeline.`,
+        date: accountCreatedAt,
+      },
+      {
+        type: 'first_pr',
+        title: 'First Pull Request',
+        description: firstPrNode?.title || 'First pull request milestone not reached yet.',
+        date: firstPrNode?.createdAt ?? null,
+        url: firstPrNode?.url,
+      },
+      {
+        type: 'first_issue',
+        title: 'First Issue',
+        description: firstIssueNode?.title || 'First issue milestone not reached yet.',
+        date: firstIssueNode?.createdAt ?? null,
+        url: firstIssueNode?.url,
+      },
+      {
+        type: 'first_discussion',
+        title: 'First Discussion',
+        description: firstDiscussionNode?.title || 'First discussion milestone not reached yet.',
+        date: firstDiscussionNode?.createdAt ?? null,
+        url: firstDiscussionNode?.url,
+      },
+    ];
+
+    const prMilestones = buildMilestoneThresholds(totalPullRequests);
+    if (prMilestones.length) {
+      type PrMilestonePageData = {
+        search?: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: Array<{ title: string; url: string; createdAt: string }>;
+        };
+      };
+
+      const milestoneQuery = `
+        query($searchQuery: String!, $after: String) {
+          search(query: $searchQuery, type: ISSUE, first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes { ... on PullRequest { title url createdAt } }
+          }
+        }
+      `;
+
+      let nextCursor: string | null = null;
+      let hasNextPage = true;
+      let seen = 0;
+      let milestoneIndex = 0;
+
+      while (hasNextPage && milestoneIndex < prMilestones.length) {
+        const page: { data?: PrMilestonePageData; errors?: GraphQLError[] } =
+          await requestGraphQL<PrMilestonePageData>(milestoneQuery, {
+            searchQuery: firstPrSearch,
+            after: nextCursor,
+          });
+
+        if (page.errors?.length) {
+          return json({ error: page.errors[0].message }, 400);
+        }
+
+        const nodes = page.data?.search?.nodes ?? [];
+        for (const pr of nodes) {
+          seen += 1;
+          while (milestoneIndex < prMilestones.length && prMilestones[milestoneIndex] === seen) {
+            const milestone = prMilestones[milestoneIndex];
+            events.push({
+              type: 'pr_count',
+              title: `${milestone.toLocaleString()} Pull Requests`,
+              description: `Reached ${milestone.toLocaleString()} pull requests.`,
+              date: pr.createdAt ?? null,
+              count: milestone,
+              url: pr.url,
+            });
+            milestoneIndex += 1;
+          }
+          if (milestoneIndex >= prMilestones.length) break;
+        }
+
+        hasNextPage = page.data?.search?.pageInfo?.hasNextPage ?? false;
+        nextCursor = page.data?.search?.pageInfo?.endCursor ?? null;
+      }
+    }
+
+    const accountCreatedYear = accountCreatedAt
+      ? new Date(accountCreatedAt).getFullYear()
+      : new Date().getFullYear();
+    const currentYear = new Date().getFullYear();
+
+    const commitQuery = `
+      query($login: String!, $from: DateTime!, $to: DateTime!) {
+        user(login: $login) {
+          contributionsCollection(from: $from, to: $to) {
+            totalCommitContributions
+          }
+        }
+      }
+    `;
+
+    const commitsByYear: Array<{ year: number; commits: number }> = [];
+    for (let year = accountCreatedYear; year <= currentYear; year++) {
+      const commitResult = await requestGraphQL<{
+        user?: {
+          contributionsCollection?: {
+            totalCommitContributions: number;
+          };
+        };
+      }>(commitQuery, {
+        login,
+        from: `${year}-01-01T00:00:00Z`,
+        to: `${year}-12-31T23:59:59Z`,
+      });
+
+      if (commitResult.errors?.length) {
+        return json({ error: commitResult.errors[0].message }, 400);
+      }
+
+      commitsByYear.push({
+        year,
+        commits: commitResult.data?.user?.contributionsCollection?.totalCommitContributions ?? 0,
+      });
+    }
+
+    const totalCommits = commitsByYear.reduce((sum, item) => sum + item.commits, 0);
+    const commitMilestones = buildMilestoneThresholds(totalCommits);
+
+    let runningCommits = 0;
+    let commitMilestoneIndex = 0;
+    for (const yearData of commitsByYear) {
+      runningCommits += yearData.commits;
+      while (
+        commitMilestoneIndex < commitMilestones.length &&
+        runningCommits >= commitMilestones[commitMilestoneIndex]
+      ) {
+        const milestone = commitMilestones[commitMilestoneIndex];
+        events.push({
+          type: 'commit_count',
+          title: `${milestone.toLocaleString()} Commits`,
+          description: `Reached in ${yearData.year}.`,
+          date: `${yearData.year}-01-01T00:00:00.000Z`,
+          count: milestone,
+        });
+        commitMilestoneIndex += 1;
+      }
+    }
+
+    events.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    return json({
+      username: login,
+      totalPullRequests,
+      totalCommits,
+      totalIssues,
+      totalDiscussions,
+      events,
+    });
+  } catch (err) {
+    console.error('GitHub milestones error:', err);
+    return json({ error: 'Failed to fetch milestones' }, 500);
+  }
+}
+
+/**
  * POST /api/stories/generate
  */
 async function handleGenerateStory(
@@ -790,6 +1080,8 @@ export default {
       response = await handleRepositoryContributions(request, session);
     } else if (path === '/api/github/discussions' && method === 'GET') {
       response = await handleDiscussions(request, session);
+    } else if (path === '/api/github/milestones' && method === 'POST') {
+      response = await handleMilestones(request, session);
     } else if (path === '/api/stories/generate' && method === 'POST') {
       response = await handleGenerateStory(request, env, session);
     } else {
