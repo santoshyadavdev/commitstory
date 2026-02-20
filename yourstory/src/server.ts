@@ -283,11 +283,12 @@ async function handleContributions(request: Request, session: SessionData): Prom
     return json({ error: 'Not authenticated' }, 401);
   }
 
+  const login = session.user.login;
   const year = parseInt(new URL(request.url).searchParams.get('year') ?? '') || new Date().getFullYear();
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
-  const query = `
+  const queryWithPrivateContributions = `
     query($login: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $login) {
         contributionsCollection(from: $from, to: $to) {
@@ -301,44 +302,109 @@ async function handleContributions(request: Request, session: SessionData): Prom
     }
   `;
 
+  const queryWithoutPrivateContributions = `
+    query($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
+          totalCommitContributions
+          totalIssueContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+        }
+      }
+    }
+  `;
+
   try {
-    const response = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'commitstory-app',
-      },
-      body: JSON.stringify({ query, variables: { login: session.user.login, from, to } }),
-    });
+    const requestGraphQL = (query: string) =>
+      fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'commitstory-app',
+        },
+        body: JSON.stringify({ query, variables: { login, from, to } }),
+      });
+
+    const response = await requestGraphQL(queryWithPrivateContributions);
 
     if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
+
+    type ContributionsCollection = {
+      totalCommitContributions: number;
+      totalIssueContributions: number;
+      totalPullRequestContributions: number;
+      totalPullRequestReviewContributions: number;
+      restrictedContributionsCount?: number;
+    };
 
     const data = (await response.json()) as {
       data?: {
         user?: {
-          contributionsCollection?: {
-            totalCommitContributions: number;
-            totalIssueContributions: number;
-            totalPullRequestContributions: number;
-            totalPullRequestReviewContributions: number;
-            restrictedContributionsCount: number;
-          };
+          contributionsCollection?: ContributionsCollection;
         };
       };
-      errors?: { message: string }[];
+      errors?: Array<{
+        message: string;
+        type?: string;
+        extensions?: {
+          saml_failure?: boolean;
+          type?: string;
+        };
+      }>;
     };
 
-    if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
+    let privateContributionsBlocked = false;
+    let c = data.data?.user?.contributionsCollection;
+    if (data.errors?.length) {
+      const hasSamlError = data.errors.some((error) => {
+        const message = error.message?.toLowerCase() ?? '';
+        return (
+          error.extensions?.saml_failure === true ||
+          error.type === 'FORBIDDEN' ||
+          error.extensions?.type === 'FORBIDDEN' ||
+          message.includes('saml enforcement') ||
+          message.includes('organization saml')
+        );
+      });
 
-    const c = data.data?.user?.contributionsCollection;
+      if (!hasSamlError) {
+        return json({ error: data.errors[0].message }, 400);
+      }
+
+      privateContributionsBlocked = true;
+
+      // Retry without restrictedContributionsCount so we can still return public totals.
+      const fallbackResponse = await requestGraphQL(queryWithoutPrivateContributions);
+      if (fallbackResponse.ok) {
+        const fallbackData = (await fallbackResponse.json()) as {
+          data?: {
+            user?: {
+              contributionsCollection?: ContributionsCollection;
+            };
+          };
+          errors?: Array<{
+            message: string;
+            type?: string;
+            extensions?: {
+              saml_failure?: boolean;
+              type?: string;
+            };
+          }>;
+        };
+        c = fallbackData.data?.user?.contributionsCollection ?? c;
+      }
+    }
+
     return json({
       year,
       commits: c?.totalCommitContributions ?? 0,
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: c?.restrictedContributionsCount ?? 0,
+      privateContributions: privateContributionsBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
+      ...(privateContributionsBlocked ? { privateContributionsBlocked: true } : {}),
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
