@@ -65,7 +65,7 @@ const GITHUB_PATH =
         >
           Harness the power of Google Gemini AI to transform years of commits,
           pull requests, and code reviews into personalized career narratives
-          &mdash; told in the genre you choose.
+          &mdash; told in the genre you choose and available in English, Hindi, Mandarin Chinese, Japanese, Spanish, French, and German.
         </p>
 
         <!-- Primary CTA with glow -->
@@ -253,7 +253,7 @@ const GITHUB_PATH =
               <div class="text-3xl mb-3" aria-hidden="true">&#128640;</div>
               <h3 class="font-bold text-xl mb-2 text-white">Generate Your Story</h3>
               <p class="text-gray-400 text-sm leading-relaxed">
-                Choose your favourite genre and let Gemini AI craft a personalized narrative of your developer journey
+                Choose your favourite genre and story language (English, Hindi, Mandarin Chinese, Japanese, Spanish, French, or German) and let Gemini AI craft a personalized narrative of your developer journey
               </p>
             </div>
 
