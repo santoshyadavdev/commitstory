@@ -9,7 +9,6 @@ interface ContributionsResponse {
   issues: number;
   pullRequests: number;
   reviews: number;
-  privateContributions: number;
 }
 
 interface DiscussionsResponse {
@@ -67,7 +66,6 @@ export class GitHubService {
         issues: contributions.issues,
         pullRequests: contributions.pullRequests,
         reviews: contributions.reviews,
-        privateContributions: contributions.privateContributions,
         lifetimeDiscussions: discussions.lifetimeDiscussions,
         lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
       }))
@@ -130,7 +128,6 @@ export class GitHubService {
           issues: contributions.reduce((sum, c) => sum + c.issues, 0),
           pullRequests: contributions.reduce((sum, c) => sum + c.pullRequests, 0),
           reviews: contributions.reduce((sum, c) => sum + c.reviews, 0),
-          privateContributions: contributions.reduce((sum, c) => sum + c.privateContributions, 0),
           lifetimeDiscussions: discussions.lifetimeDiscussions,
           lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
           topRepositories,

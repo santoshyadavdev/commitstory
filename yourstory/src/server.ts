@@ -295,7 +295,6 @@ async function handleContributions(request: Request, session: SessionData): Prom
           totalIssueContributions
           totalPullRequestContributions
           totalPullRequestReviewContributions
-          restrictedContributionsCount
         }
       }
     }
@@ -322,7 +321,6 @@ async function handleContributions(request: Request, session: SessionData): Prom
             totalIssueContributions: number;
             totalPullRequestContributions: number;
             totalPullRequestReviewContributions: number;
-            restrictedContributionsCount: number;
           };
         };
       };
@@ -338,7 +336,6 @@ async function handleContributions(request: Request, session: SessionData): Prom
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: c?.restrictedContributionsCount ?? 0,
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
@@ -584,7 +581,6 @@ async function handleGenerateStory(
       reviews?: number;
       lifetimeDiscussions?: number;
       lifetimeDiscussionComments?: number;
-      privateContributions?: number;
     };
 
     const systemInstruction = [
@@ -617,7 +613,6 @@ async function handleGenerateStory(
       `- Code Reviews: ${act.reviews ?? 0}`,
       `- Lifetime Discussions: ${act.lifetimeDiscussions ?? 0}`,
       `- Lifetime Discussion Comments: ${act.lifetimeDiscussionComments ?? 0}`,
-      `- Private Contributions: ${act.privateContributions ?? 0}`,
       `Weave these metrics into a cohesive, entertaining narrative in the ${genre} style.`,
       `Output both title and story in ${selectedLanguage}.`,
       `Respond exactly in this format:`,
