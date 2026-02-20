@@ -548,8 +548,9 @@ async function handleGenerateStory(
     return json({ error: 'genre must be a non-empty string' }, 400);
   }
   const selectedLanguage = typeof language === 'string' && language.trim() ? language : 'English';
-  if (!['English', 'Hindi'].includes(selectedLanguage)) {
-    return json({ error: "language must be either 'English' or 'Hindi'" }, 400);
+  const allowedLanguages = ['English', 'Hindi', 'Mandarin Chinese', 'Japanese', 'Spanish', 'French', 'German'];
+  if (!allowedLanguages.includes(selectedLanguage)) {
+    return json({ error: "language must be one of: English, Hindi, Mandarin Chinese, Japanese, Spanish, French, German" }, 400);
   }
   if (!activity || typeof activity !== 'object') {
     return json({ error: 'activity must be a contribution data object' }, 400);
@@ -647,8 +648,16 @@ async function handleGenerateStory(
     const rawResponse = result.response.text().trim();
     const titleAndStoryMatch = rawResponse.match(/TITLE:\s*([\s\S]*?)\nSTORY:\s*([\s\S]*)/i);
 
-    const fallbackTitle =
-      selectedLanguage === 'Hindi' ? 'कोडिंग यात्रा की कहानी' : 'A Developer Journey';
+    const fallbackTitleByLanguage: Record<string, string> = {
+      English: 'A Developer Journey',
+      Hindi: 'कोडिंग यात्रा की कहानी',
+      'Mandarin Chinese': '开发者之旅',
+      Japanese: '開発者の旅',
+      Spanish: 'Un Viaje de Desarrollador',
+      French: 'Un Voyage de Développeur',
+      German: 'Eine Entwicklerreise',
+    };
+    const fallbackTitle = fallbackTitleByLanguage[selectedLanguage] ?? 'A Developer Journey';
     const parsedTitle = titleAndStoryMatch?.[1]?.trim() || fallbackTitle;
     const parsedStory = titleAndStoryMatch?.[2]?.trim() || rawResponse;
 

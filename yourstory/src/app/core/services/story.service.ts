@@ -30,7 +30,7 @@ export const GENRES = [
   'Sports',
 ] as const;
 
-export const LANGUAGES = ['English', 'Hindi'] as const;
+export const LANGUAGES = ['English', 'Hindi', 'Mandarin Chinese', 'Japanese', 'Spanish', 'French', 'German'] as const;
 
 @Injectable({ providedIn: 'root' })
 export class StoryService {
