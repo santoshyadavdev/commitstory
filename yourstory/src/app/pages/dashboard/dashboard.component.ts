@@ -60,29 +60,33 @@ import { SharePlatform } from '../../core/constants/share.constants';
 
         @if (viewMode() === 'story') {
           <div class="flex flex-wrap items-center gap-3 mb-8">
-            <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Story Genre</label>
-            <select
-              id="story-genre"
-              class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
-              [ngModel]="selectedGenre()"
-              (ngModelChange)="selectedGenre.set($event)"
-            >
-              @for (genre of genres; track genre) {
-                <option [value]="genre">{{ genre }}</option>
-              }
-            </select>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Story Genre</label>
+              <select
+                id="story-genre"
+                class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
+                [ngModel]="selectedGenre()"
+                (ngModelChange)="selectedGenre.set($event)"
+              >
+                @for (genre of genres; track genre) {
+                  <option [value]="genre">{{ genre }}</option>
+                }
+              </select>
+            </div>
 
-            <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Story Language</label>
-            <select
-              id="story-language"
-              class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
-              [ngModel]="selectedLanguage()"
-              (ngModelChange)="selectedLanguage.set($event)"
-            >
-              @for (language of languages; track language) {
-                <option [value]="language">{{ language }}</option>
-              }
-            </select>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Story Language</label>
+              <select
+                id="story-language"
+                class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
+                [ngModel]="selectedLanguage()"
+                (ngModelChange)="selectedLanguage.set($event)"
+              >
+                @for (language of languages; track language) {
+                  <option [value]="language">{{ language }}</option>
+                }
+              </select>
+            </div>
 
             <button
               class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
