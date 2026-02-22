@@ -3,3 +3,26 @@
 @tailwind utilities;
 
 /* You can add global styles to this file, and also import other style files */
+
+@layer base {
+  :root {
+    --color-bg: #F6F6F1;
+    --color-bg-dark: #171717;
+  }
+
+  html {
+    @apply bg-coderabbit-cream;
+  }
+
+  html.dark {
+    @apply bg-coderabbit-neutral;
+  }
+
+  body {
+    @apply bg-coderabbit-cream text-gray-900;
+  }
+
+  html.dark body {
+    @apply bg-coderabbit-neutral text-white;
+  }
+}

@@ -18,13 +18,13 @@ const GITHUB_PATH =
     `,
   ],
   template: `
-    <div class="min-h-screen bg-gray-950 text-white overflow-x-hidden">
+    <div class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white overflow-x-hidden">
 
       <!-- Decorative gradient background orbs -->
       <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-blob"></div>
-        <div class="absolute top-1/3 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-blob animation-delay-2s"></div>
-        <div class="absolute bottom-20 right-1/4 w-80 h-80 bg-pink-600/15 rounded-full blur-3xl animate-blob animation-delay-4s"></div>
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-coderabbit-orange/10 dark:bg-coderabbit-orange/20 rounded-full blur-3xl animate-blob"></div>
+        <div class="absolute top-1/3 -left-40 w-96 h-96 bg-coderabbit-aquamarine/10 dark:bg-coderabbit-aquamarine/20 rounded-full blur-3xl animate-blob animation-delay-2s"></div>
+        <div class="absolute bottom-20 right-1/4 w-80 h-80 bg-coderabbit-pink/10 dark:bg-coderabbit-pink/15 rounded-full blur-3xl animate-blob animation-delay-4s"></div>
       </div>
 
       <!-- ===== HERO SECTION ===== -->
@@ -53,7 +53,7 @@ const GITHUB_PATH =
         >
           Transform Your GitHub Journey Into
           <span
-            class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent block sm:inline"
+            class="bg-gradient-to-r from-coderabbit-orange via-coderabbit-pink to-coderabbit-aquamarine bg-clip-text text-transparent block sm:inline"
           >
             Epic Stories
           </span>
@@ -61,7 +61,7 @@ const GITHUB_PATH =
 
         <!-- Sub-headline -->
         <p
-          class="text-lg md:text-xl text-gray-400 max-w-2xl mb-12 leading-relaxed animate-fade-in-slow"
+          class="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mb-12 leading-relaxed animate-fade-in-slow"
         >
           Harness the power of Google Gemini AI to transform years of commits,
           pull requests, and code reviews into personalized career narratives
@@ -71,7 +71,7 @@ const GITHUB_PATH =
         <!-- Primary CTA with glow -->
         <div class="relative group animate-fade-in-slow">
           <div
-            class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-xl blur opacity-60 animate-glow-pulse transition-opacity duration-300 group-hover:opacity-100"
+            class="absolute -inset-1 bg-gradient-to-r from-coderabbit-orange via-coderabbit-pink to-coderabbit-aquamarine rounded-xl blur opacity-60 animate-glow-pulse transition-opacity duration-300 group-hover:opacity-100"
             aria-hidden="true"
           ></div>
           <button
@@ -92,7 +92,7 @@ const GITHUB_PATH =
           </button>
         </div>
 
-        <p class="mt-5 text-gray-500 text-sm animate-fade-in-slower">
+        <p class="mt-5 text-gray-500 dark:text-gray-500 text-sm animate-fade-in-slower">
           No credit card required &middot; Public repos only &middot; Read-only access
         </p>
 
@@ -115,7 +115,7 @@ const GITHUB_PATH =
             <h2 id="features-heading" class="text-3xl md:text-4xl font-bold mb-4">
               Everything You Need to Tell Your Story
             </h2>
-            <p class="text-gray-400 max-w-xl mx-auto">
+            <p class="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
               Four years of your GitHub data, infinite ways to tell the story.
             </p>
           </div>
@@ -124,44 +124,44 @@ const GITHUB_PATH =
 
             <!-- Card: 8 Story Genres -->
             <div
-              class="bg-gray-900/50 backdrop-blur rounded-xl border border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/10"
+              class="bg-white/60 dark:bg-gray-900/50 backdrop-blur rounded-xl border border-gray-200 dark:border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-coderabbit-orange/50 hover:shadow-xl hover:shadow-coderabbit-orange/10"
             >
-              <div class="text-4xl mb-4" aria-hidden="true">&#127917;</div>
-              <h3 class="font-bold text-lg mb-2 text-white">8 Story Genres</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-4xl mb-4 leading-none" aria-hidden="true">&#127917;</div>
+              <h3 class="font-bold text-lg mb-2 text-gray-900 dark:text-white">8 Story Genres</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Drama, Comedy, Thriller, Sci-Fi, Romance, Mystery, Action &amp; more narrative styles
               </p>
             </div>
 
             <!-- Card: 10 Years of Data -->
             <div
-              class="bg-gray-900/50 backdrop-blur rounded-xl border border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10"
+              class="bg-white/60 dark:bg-gray-900/50 backdrop-blur rounded-xl border border-gray-200 dark:border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-coderabbit-aquamarine/50 hover:shadow-xl hover:shadow-coderabbit-aquamarine/10"
             >
-              <div class="text-4xl mb-4" aria-hidden="true">&#128202;</div>
-              <h3 class="font-bold text-lg mb-2 text-white">Max 10 Years of Data</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-4xl mb-4 leading-none" aria-hidden="true">&#128202;</div>
+              <h3 class="font-bold text-lg mb-2 text-gray-900 dark:text-white">Max 10 Years of Data</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Aggregate commits, PRs, issues, and code reviews across your entire history
               </p>
             </div>
 
             <!-- Card: AI-Powered Narratives -->
             <div
-              class="bg-gray-900/50 backdrop-blur rounded-xl border border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/10"
+              class="bg-white/60 dark:bg-gray-900/50 backdrop-blur rounded-xl border border-gray-200 dark:border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-coderabbit-pink/50 hover:shadow-xl hover:shadow-coderabbit-pink/10"
             >
-              <div class="text-4xl mb-4" aria-hidden="true">&#10024;</div>
-              <h3 class="font-bold text-lg mb-2 text-white">AI-Powered Narratives</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-4xl mb-4 leading-none" aria-hidden="true">&#10024;</div>
+              <h3 class="font-bold text-lg mb-2 text-gray-900 dark:text-white">AI-Powered Narratives</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Google Gemini generates rich, personalized stories from your unique contribution data
               </p>
             </div>
 
             <!-- Card: Shareable Cards -->
             <div
-              class="bg-gray-900/50 backdrop-blur rounded-xl border border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10"
+              class="bg-white/60 dark:bg-gray-900/50 backdrop-blur rounded-xl border border-gray-200 dark:border-gray-800 p-6 transition-all duration-300 hover:scale-105 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10"
             >
-              <div class="text-4xl mb-4" aria-hidden="true">&#127183;</div>
-              <h3 class="font-bold text-lg mb-2 text-white">Shareable Cards</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-4xl mb-4 leading-none" aria-hidden="true">&#127183;</div>
+              <h3 class="font-bold text-lg mb-2 text-gray-900 dark:text-white">Shareable Cards</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Download and share your developer story card on LinkedIn, Twitter, and beyond
               </p>
             </div>
@@ -172,31 +172,31 @@ const GITHUB_PATH =
 
       <!-- ===== HOW IT WORKS SECTION ===== -->
       <section
-        class="relative py-24 px-4 bg-gray-900/30"
+        class="relative py-24 px-4 bg-gray-100/50 dark:bg-gray-900/30"
         id="how-it-works"
         aria-labelledby="how-heading"
       >
         <div class="max-w-5xl mx-auto">
           <div class="text-center mb-16">
             <h2 id="how-heading" class="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-            <p class="text-gray-400 max-w-xl mx-auto">From GitHub to story in three simple steps.</p>
+            <p class="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">From GitHub to story in three simple steps.</p>
           </div>
 
           <div class="flex flex-col md:flex-row items-stretch">
 
             <!-- Step 1 -->
             <div
-              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-800/40 group"
+              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 group"
             >
               <div
-                class="w-16 h-16 rounded-full bg-indigo-500/20 border-2 border-indigo-500/40 flex items-center justify-center text-indigo-400 font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-indigo-500/30 group-hover:border-indigo-400"
+                class="w-16 h-16 rounded-full bg-coderabbit-orange/20 border-2 border-coderabbit-orange/40 flex items-center justify-center text-coderabbit-orange font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-coderabbit-orange/30 group-hover:border-coderabbit-orange"
                 aria-hidden="true"
               >
                 1
               </div>
-              <div class="text-3xl mb-3" aria-hidden="true">&#128279;</div>
-              <h3 class="font-bold text-xl mb-2 text-white">Connect GitHub</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-3xl mb-3 leading-none" aria-hidden="true">&#128279;</div>
+              <h3 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">Connect GitHub</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 One-click OAuth authentication grants read-only access to your public contribution data
               </p>
             </div>
@@ -214,17 +214,17 @@ const GITHUB_PATH =
 
             <!-- Step 2 -->
             <div
-              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-800/40 group"
+              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 group"
             >
               <div
-                class="w-16 h-16 rounded-full bg-purple-500/20 border-2 border-purple-500/40 flex items-center justify-center text-purple-400 font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-purple-500/30 group-hover:border-purple-400"
+                class="w-16 h-16 rounded-full bg-coderabbit-aquamarine/20 border-2 border-coderabbit-aquamarine/40 flex items-center justify-center text-coderabbit-aquamarine font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-coderabbit-aquamarine/30 group-hover:border-coderabbit-aquamarine"
                 aria-hidden="true"
               >
                 2
               </div>
-              <div class="text-3xl mb-3" aria-hidden="true">&#128200;</div>
-              <h3 class="font-bold text-xl mb-2 text-white">View Your Stats</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-3xl mb-3 leading-none" aria-hidden="true">&#128200;</div>
+              <h3 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">View Your Stats</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Explore up to 10 years of commits, pull requests, issues, and code reviews — or your last 4 years if your account is newer.
               </p>
             </div>
@@ -242,17 +242,17 @@ const GITHUB_PATH =
 
             <!-- Step 3 -->
             <div
-              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-800/40 group"
+              class="flex-1 flex flex-col items-center text-center px-6 py-8 rounded-2xl transition-all duration-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 group"
             >
               <div
-                class="w-16 h-16 rounded-full bg-pink-500/20 border-2 border-pink-500/40 flex items-center justify-center text-pink-400 font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-pink-500/30 group-hover:border-pink-400"
+                class="w-16 h-16 rounded-full bg-coderabbit-pink/20 border-2 border-coderabbit-pink/40 flex items-center justify-center text-coderabbit-orange font-extrabold text-2xl mb-6 transition-all duration-300 group-hover:bg-coderabbit-pink/30 group-hover:border-coderabbit-pink"
                 aria-hidden="true"
               >
                 3
               </div>
-              <div class="text-3xl mb-3" aria-hidden="true">&#128640;</div>
-              <h3 class="font-bold text-xl mb-2 text-white">Generate Your Story</h3>
-              <p class="text-gray-400 text-sm leading-relaxed">
+              <div class="flex items-center justify-center text-3xl mb-3 leading-none" aria-hidden="true">&#128640;</div>
+              <h3 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">Generate Your Story</h3>
+              <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Choose your favourite genre and story language (English, Hindi, Mandarin Chinese, Japanese, Spanish, French, or German) and let Gemini AI craft a personalized narrative of your developer journey
               </p>
             </div>
@@ -270,7 +270,7 @@ const GITHUB_PATH =
         <div class="max-w-5xl mx-auto">
           <div class="text-center mb-12">
             <h2 id="tech-heading" class="text-3xl md:text-4xl font-bold mb-4">Built With Modern Tech</h2>
-            <p class="text-gray-400 max-w-xl mx-auto">
+            <p class="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
               A carefully curated stack for performance, developer experience, and AI capability.
             </p>
           </div>
@@ -279,32 +279,32 @@ const GITHUB_PATH =
 
             <!-- Angular -->
             <div
-              class="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-red-500/50 hover:bg-gray-900/80 hover:scale-105"
+              class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-red-500/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
               <span class="text-red-500 text-2xl font-bold leading-none" aria-hidden="true">&#9650;</span>
               <div>
-                <div class="font-semibold text-white text-sm">Angular 21</div>
-                <div class="text-gray-500 text-xs">SSR-enabled framework</div>
+                <div class="font-semibold text-gray-900 dark:text-white text-sm">Angular 21</div>
+                <div class="text-gray-500 dark:text-gray-500 text-xs">SSR-enabled framework</div>
               </div>
             </div>
 
             <!-- Tailwind CSS -->
             <div
-              class="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-cyan-500/50 hover:bg-gray-900/80 hover:scale-105"
+              class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-cyan-500/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
               <span class="text-cyan-400 text-2xl font-extrabold leading-none" aria-hidden="true">&#126;</span>
               <div>
-                <div class="font-semibold text-white text-sm">Tailwind CSS</div>
-                <div class="text-gray-500 text-xs">Utility-first styling</div>
+                <div class="font-semibold text-gray-900 dark:text-white text-sm">Tailwind CSS</div>
+                <div class="text-gray-500 dark:text-gray-500 text-xs">Utility-first styling</div>
               </div>
             </div>
 
             <!-- GitHub GraphQL API -->
             <div
-              class="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-gray-400/50 hover:bg-gray-900/80 hover:scale-105"
+              class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-gray-400/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
               <svg
-                class="w-6 h-6 text-gray-300"
+                class="w-6 h-6 text-gray-600 dark:text-gray-300"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
@@ -313,30 +313,30 @@ const GITHUB_PATH =
                 <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
               </svg>
               <div>
-                <div class="font-semibold text-white text-sm">GitHub GraphQL API</div>
-                <div class="text-gray-500 text-xs">Rich contribution data</div>
+                <div class="font-semibold text-gray-900 dark:text-white text-sm">GitHub GraphQL API</div>
+                <div class="text-gray-500 dark:text-gray-500 text-xs">Rich contribution data</div>
               </div>
             </div>
 
             <!-- Google Gemini AI -->
             <div
-              class="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-blue-500/50 hover:bg-gray-900/80 hover:scale-105"
+              class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-blue-500/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
-              <span class="text-blue-400 text-2xl" aria-hidden="true">&#10024;</span>
+              <span class="text-blue-400 text-2xl leading-none" aria-hidden="true">&#10024;</span>
               <div>
-                <div class="font-semibold text-white text-sm">Google Gemini AI</div>
-                <div class="text-gray-500 text-xs">Story generation</div>
+                <div class="font-semibold text-gray-900 dark:text-white text-sm">Google Gemini AI</div>
+                <div class="text-gray-500 dark:text-gray-500 text-xs">Story generation</div>
               </div>
             </div>
 
             <!-- Node.js / Express -->
             <div
-              class="flex items-center gap-3 bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-green-500/50 hover:bg-gray-900/80 hover:scale-105"
+              class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-green-500/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
-              <span class="text-green-400 text-2xl font-bold" aria-hidden="true">&#9654;</span>
+              <span class="text-green-400 text-2xl font-bold leading-none" aria-hidden="true">&#9654;</span>
               <div>
-                <div class="font-semibold text-white text-sm">Node.js / Express</div>
-                <div class="text-gray-500 text-xs">Backend &amp; OAuth server</div>
+                <div class="font-semibold text-gray-900 dark:text-white text-sm">Node.js / Express</div>
+                <div class="text-gray-500 dark:text-gray-500 text-xs">Backend &amp; OAuth server</div>
               </div>
             </div>
 
@@ -345,27 +345,27 @@ const GITHUB_PATH =
       </section>
 
       <!-- ===== CREDITS SECTION ===== -->
-      <section class="relative py-16 px-4 bg-gray-900/20" aria-label="Credits">
+      <section class="relative py-16 px-4 bg-gray-100/20 dark:bg-gray-900/20" aria-label="Credits">
         <div class="max-w-2xl mx-auto text-center">
           <div
-            class="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-10"
+            class="h-px bg-gradient-to-r from-transparent via-gray-400 dark:via-gray-700 to-transparent mb-10"
             aria-hidden="true"
           ></div>
-          <p class="text-gray-400 text-sm leading-relaxed">
+          <p class="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
             Built with
             <span class="animate-pulse text-pink-400" aria-label="love">&#10084;&#65039;</span>
             by
-            <span class="text-gray-300 font-medium">CodeRabbit Issue Planner</span>,
-            <span class="text-gray-300 font-medium">GitHub Copilot</span>
+            <span class="text-gray-700 dark:text-gray-300 font-medium">CodeRabbit Issue Planner</span>,
+            <span class="text-gray-700 dark:text-gray-300 font-medium">GitHub Copilot</span>
             and
-            <span class="text-gray-300 font-medium">Gemini</span>
+            <span class="text-gray-700 dark:text-gray-300 font-medium">Gemini</span>
           </p>
         </div>
       </section>
 
       <!-- ===== FOOTER ===== -->
       <footer
-        class="relative py-20 px-4 border-t border-gray-800/50"
+        class="relative py-20 px-4 border-t border-gray-300/50 dark:border-gray-800/50"
         role="contentinfo"
       >
         <div class="max-w-2xl mx-auto text-center">
@@ -382,13 +382,13 @@ const GITHUB_PATH =
             <h2 class="text-2xl font-bold">Ready to Tell Your Story?</h2>
           </div>
 
-          <p class="text-gray-400 mb-8">
+          <p class="text-gray-600 dark:text-gray-400 mb-8">
             Join developers who have already transformed their GitHub journey into epic narratives.
           </p>
 
           <button
             (click)="authService.login()"
-            class="inline-flex items-center gap-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 shadow-2xl shadow-purple-500/25 cursor-pointer"
+            class="inline-flex items-center gap-3 bg-gradient-to-r from-coderabbit-orange via-coderabbit-pink to-coderabbit-aquamarine hover:from-coderabbit-orange/90 hover:via-coderabbit-pink/90 hover:to-coderabbit-aquamarine/90 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 shadow-2xl shadow-coderabbit-orange/25 cursor-pointer"
             aria-label="Get started free by signing in with GitHub"
           >
             <svg
@@ -403,7 +403,7 @@ const GITHUB_PATH =
             Get Started Free with GitHub
           </button>
 
-          <p class="mt-8 text-gray-600 text-sm">
+          <p class="mt-8 text-gray-500 dark:text-gray-600 text-sm">
             &copy; 2026 CommitStory. All rights reserved.
           </p>
         </div>

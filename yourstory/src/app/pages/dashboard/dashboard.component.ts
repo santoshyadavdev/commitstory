@@ -5,34 +5,37 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ActivitySummary, MilestoneEvent, MilestoneType, TimelineData } from '../../core/models/activity.models';
 import { GitHubService } from '../../core/services/github.service';
 import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="min-h-screen bg-gray-950 text-white p-6">
+    <div class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white p-6">
       <div class="max-w-5xl mx-auto">
         <h2 class="text-3xl font-bold mb-4">Your GitHub Story</h2>
-        <p class="text-gray-400 mb-8">
+        <p class="text-gray-600 dark:text-gray-400 mb-8">
           Generate a career-spanning story or explore your milestone timeline based on your GitHub activity.
         </p>
 
-        <div class="inline-flex bg-gray-900 border border-gray-800 rounded-lg p-1 mb-8">
+        <div class="inline-flex bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-1 mb-8">
           <button
             class="px-4 py-2 text-sm rounded-md transition-colors"
-            [class.bg-indigo-600]="viewMode() === 'story'"
+            [class.bg-coderabbit-orange]="viewMode() === 'story'"
             [class.text-white]="viewMode() === 'story'"
-            [class.text-gray-300]="viewMode() !== 'story'"
+            [class.text-gray-600]="viewMode() !== 'story'"
+            [class.dark:text-gray-300]="viewMode() !== 'story'"
             (click)="setViewMode('story')"
           >
             Generate Story
           </button>
           <button
             class="px-4 py-2 text-sm rounded-md transition-colors"
-            [class.bg-indigo-600]="viewMode() === 'timeline'"
+            [class.bg-coderabbit-orange]="viewMode() === 'timeline'"
             [class.text-white]="viewMode() === 'timeline'"
-            [class.text-gray-300]="viewMode() !== 'timeline'"
+            [class.text-gray-600]="viewMode() !== 'timeline'"
+            [class.dark:text-gray-300]="viewMode() !== 'timeline'"
             (click)="onViewTimeline()"
           >
             View Timeline
@@ -41,10 +44,10 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
 
         @if (viewMode() === 'story') {
           <div class="flex flex-wrap items-center gap-3 mb-8">
-            <label class="text-xs text-gray-400" for="story-genre">Story Genre</label>
+            <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Story Genre</label>
             <select
               id="story-genre"
-              class="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
               [ngModel]="selectedGenre()"
               (ngModelChange)="selectedGenre.set($event)"
             >
@@ -53,10 +56,10 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
               }
             </select>
 
-            <label class="text-xs text-gray-400" for="story-language">Story Language</label>
+            <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Story Language</label>
             <select
               id="story-language"
-              class="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
               [ngModel]="selectedLanguage()"
               (ngModelChange)="selectedLanguage.set($event)"
             >
@@ -66,7 +69,7 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
             </select>
 
             <button
-              class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               [disabled]="isGenerating()"
               (click)="onGenerateStory()"
             >
@@ -80,64 +83,64 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
           </div>
 
           @if (aggregatedActivity(); as activity) {
-            <div #shareCard class="bg-gray-900 rounded-2xl p-6 shadow-lg mb-4">
+            <div #shareCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg mb-4">
               <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-semibold text-indigo-400">Career Totals</h3>
-                <span class="text-xs text-gray-500">commitstory</span>
+                <h3 class="text-xl font-semibold text-coderabbit-orange">Career Totals</h3>
+                <span class="text-xs text-gray-500 dark:text-gray-500">commitstory</span>
               </div>
 
               <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.commits }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Commits</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.commits }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Commits</p>
                 </div>
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.issues }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Issues</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.issues }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Issues</p>
                 </div>
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.pullRequests }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Pull Requests</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.pullRequests }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Pull Requests</p>
                 </div>
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.reviews }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Reviews</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.reviews }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Reviews</p>
                 </div>
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.lifetimeDiscussions }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Discussions</p>
-                  <p class="text-xs text-gray-600 mt-0.5">all time</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.lifetimeDiscussions }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Discussions</p>
+                  <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">all time</p>
                 </div>
-                <div class="bg-gray-800 rounded-xl p-4 text-center">
-                  <p class="text-3xl font-bold text-white">{{ activity.lifetimeDiscussionComments }}</p>
-                  <p class="text-xs text-gray-400 mt-1">Comments</p>
-                  <p class="text-xs text-gray-600 mt-0.5">all time</p>
+                <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ activity.lifetimeDiscussionComments }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Comments</p>
+                  <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">all time</p>
                 </div>
                 @if (memberSinceYear(); as sinceYear) {
-                  <div class="bg-gray-800 rounded-xl p-4 text-center">
-                    <p class="text-3xl font-bold text-indigo-300">{{ sinceYear }}</p>
-                    <p class="text-xs text-gray-400 mt-1">Member since</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
+                    <p class="text-3xl font-bold text-coderabbit-orange">{{ sinceYear }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Member since</p>
                   </div>
                 }
                 @if (activity.privateContributions > 0) {
-                  <div class="bg-gray-800 border border-indigo-800 rounded-xl p-4 text-center">
-                    <p class="text-3xl font-bold text-indigo-400">{{ activity.privateContributions }}</p>
-                    <p class="text-xs text-gray-400 mt-1">Private</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 border border-coderabbit-orange/40 rounded-xl p-4 text-center">
+                    <p class="text-3xl font-bold text-coderabbit-orange">{{ activity.privateContributions }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Private</p>
                   </div>
                 }
               </div>
 
               @if (generatedStory(); as storyResult) {
-                <div class="border-t border-gray-800 pt-5">
+                <div class="border-t border-gray-200 dark:border-gray-800 pt-5">
                   <div class="flex items-center gap-3 mb-3">
-                    <span class="bg-indigo-700 text-indigo-100 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    <span class="bg-coderabbit-orange text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">
                       {{ storyResult.genre }}
                     </span>
-                    <span class="text-gray-500 text-xs">~3 min read</span>
+                    <span class="text-gray-500 dark:text-gray-500 text-xs">~3 min read</span>
                   </div>
-                  <h4 class="text-2xl font-bold text-white mb-3">{{ storyResult.title }}</h4>
-                  <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
-                  <p class="text-gray-500 text-xs mt-4">Produced by CodeRabbit</p>
+                  <h4 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">{{ storyResult.title }}</h4>
+                  <p class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
+                  <p class="text-gray-500 dark:text-gray-500 text-xs mt-4">Produced by CodeRabbit</p>
                 </div>
               }
             </div>
@@ -145,7 +148,7 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
             @if (generatedStory()) {
               <div class="flex justify-end">
                 <button
-                  class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-700 transition-colors"
+                  class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
                   [disabled]="isDownloading()"
                   (click)="downloadAsImage()"
                 >
@@ -163,74 +166,73 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
 
         @if (viewMode() === 'timeline') {
           @if (timelineError()) {
-            <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
               {{ timelineError() }}
             </div>
           }
 
-          <div #timelineCard class="bg-gray-900 rounded-2xl p-6 shadow-lg mb-4 border border-gray-800">
+          <div #timelineCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
             <div class="flex items-center justify-between mb-5">
-              <h3 class="text-xl font-semibold text-indigo-400">Developer Milestone Timeline</h3>
-              <span class="text-xs text-gray-500">commitstory</span>
+              <h3 class="text-xl font-semibold text-coderabbit-orange">Developer Milestone Timeline</h3>
+              <span class="text-xs text-gray-500 dark:text-gray-500">commitstory</span>
             </div>
 
             @if (isLoadingTimeline()) {
-              <div class="flex items-center gap-3 text-gray-300 py-8">
-                <div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-400"></div>
+              <div class="flex items-center gap-3 text-gray-600 dark:text-gray-300 py-8">
+                <div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-coderabbit-orange"></div>
                 <span>Loading timeline milestones…</span>
               </div>
             } @else if (timelineData(); as timeline) {
               @if (timeline.events.length > 0) {
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                  <div class="bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold">{{ timeline.totalCommits }}</p>
-                    <p class="text-xs text-gray-400">Total Commits</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalCommits }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Commits</p>
                   </div>
-                  <div class="bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold">{{ timeline.totalPullRequests }}</p>
-                    <p class="text-xs text-gray-400">Total PRs</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalPullRequests }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total PRs</p>
                   </div>
-                  <div class="bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold">{{ timeline.totalIssues }}</p>
-                    <p class="text-xs text-gray-400">Total Issues</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalIssues }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Issues</p>
                   </div>
-                  <div class="bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold">{{ timeline.totalDiscussions }}</p>
-                    <p class="text-xs text-gray-400">Total Discussions</p>
+                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
+                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalDiscussions }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Discussions</p>
                   </div>
                 </div>
 
-                <div class="relative pl-3">
-                  <div class="absolute left-5 top-0 bottom-0 w-px bg-gray-700"></div>
+                <div class="relative">
+                  <div class="absolute left-5 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-700"></div>
                   @for (milestone of timeline.events; track milestone.type + '-' + (milestone.count ?? 0) + '-' + (milestone.date ?? 'none')) {
                     <div class="relative pl-12 pb-6 last:pb-0">
                       <div
-                        class="absolute left-0 top-1 w-10 h-10 rounded-full border flex items-center justify-center text-sm"
-                        [class.bg-indigo-500/20]="!milestone.count"
-                        [class.border-indigo-500/40]="!milestone.count"
+                        class="absolute left-0 top-1 z-10 w-10 h-10 rounded-full border flex items-center justify-center text-xl leading-none"
+                        [class.bg-coderabbit-orange/20]="!milestone.count"
+                        [class.border-coderabbit-orange/40]="!milestone.count"
                         [class.bg-emerald-500/20]="!!milestone.count"
                         [class.border-emerald-500/40]="!!milestone.count"
-                      >
-                        <span>{{ getMilestoneIcon(milestone.type) }}</span>
-                      </div>
+                        aria-hidden="true"
+                      >{{ getMilestoneIcon(milestone.type) }}</div>
 
-                      <div class="bg-gray-800/70 rounded-xl p-4 border border-gray-700">
+                      <div class="bg-gray-100/80 dark:bg-gray-800/70 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                         <div class="flex flex-wrap items-center gap-2 mb-2">
-                          <h4 class="text-base font-semibold text-white">{{ milestone.title }}</h4>
+                          <h4 class="text-base font-semibold text-gray-900 dark:text-white">{{ milestone.title }}</h4>
                           @if (milestone.count) {
                             <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-600/30 text-emerald-200">
                               {{ milestone.count }}
                             </span>
                           }
                         </div>
-                        <p class="text-sm text-gray-300 mb-2">{{ milestone.description }}</p>
-                        <p class="text-xs text-gray-400">{{ formatMilestoneDate(milestone) }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">{{ milestone.description }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatMilestoneDate(milestone) }}</p>
                         @if (milestone.url) {
                           <a
                             [href]="milestone.url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-block mt-2 text-xs text-indigo-300 hover:text-indigo-200"
+                            class="inline-block mt-2 text-xs text-coderabbit-orange hover:text-coderabbit-orange/80"
                           >
                             View on GitHub ↗
                           </a>
@@ -240,19 +242,19 @@ import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/servi
                   }
                 </div>
               } @else {
-                <div class="py-8 text-center text-gray-400">
+                <div class="py-8 text-center text-gray-500 dark:text-gray-400">
                   {{ timelineMessage() || 'No milestone data available yet.' }}
                 </div>
               }
             } @else {
-              <div class="py-8 text-center text-gray-400">Select View Timeline to load your milestones.</div>
+              <div class="py-8 text-center text-gray-500 dark:text-gray-400">Select View Timeline to load your milestones.</div>
             }
           </div>
 
           @if (timelineData() && !isLoadingTimeline()) {
             <div class="flex justify-end">
               <button
-                class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-700 transition-colors"
+                class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
                 [disabled]="isDownloadingTimeline()"
                 (click)="downloadTimelineAsImage()"
               >
@@ -277,6 +279,7 @@ export class DashboardComponent {
   private readonly githubService = inject(GitHubService);
   protected readonly authService = inject(AuthService);
   private readonly storyService = inject(StoryService);
+  private readonly themeService = inject(ThemeService);
 
   readonly genres = GENRES;
   readonly languages = LANGUAGES;
@@ -407,8 +410,9 @@ export class DashboardComponent {
     this.isDownloading.set(true);
     try {
       const { toPng } = await import('html-to-image');
+      const backgroundColor = this.themeService.isDark() ? '#171717' : '#F6F6F1';
       const dataUrl = await toPng(this.shareCard.nativeElement, {
-        backgroundColor: '#0f172a',
+        backgroundColor,
         pixelRatio: 2,
       });
       const link = document.createElement('a');
@@ -427,8 +431,9 @@ export class DashboardComponent {
     this.isDownloadingTimeline.set(true);
     try {
       const { toPng } = await import('html-to-image');
+      const backgroundColor = this.themeService.isDark() ? '#171717' : '#F6F6F1';
       const dataUrl = await toPng(this.timelineCard.nativeElement, {
-        backgroundColor: '#0f172a',
+        backgroundColor,
         pixelRatio: 2,
       });
       const link = document.createElement('a');
