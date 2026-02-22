@@ -7,6 +7,7 @@ module.exports = {
     join(__dirname, 'src/**/!(*.stories|*.spec).{ts,html}'),
     ...createGlobPatternsForDependencies(__dirname),
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       animation: {
@@ -37,6 +38,14 @@ module.exports = {
         },
       },
       colors: {
+        coderabbit: {
+          orange: '#FF570A',
+          pink: '#F2B8EB',
+          aquamarine: '#25BAB1',
+          yellow: '#F0DF22',
+          cream: '#F6F6F1',
+          neutral: '#171717',
+        },
         angular: { DEFAULT: '#dd0031', dark: '#c3002f' },
         tailwind: { DEFAULT: '#06b6d4', dark: '#0891b2' },
         gemini: { DEFAULT: '#4285f4', dark: '#1a73e8' },
