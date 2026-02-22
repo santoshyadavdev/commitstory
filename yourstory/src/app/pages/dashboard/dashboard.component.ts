@@ -4,15 +4,31 @@ import { switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ActivitySummary, MilestoneEvent, MilestoneType, TimelineData } from '../../core/models/activity.models';
 import { GitHubService } from '../../core/services/github.service';
+import { ShareService, ShareResult } from '../../core/services/share.service';
 import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { ShareDropdownComponent } from '../../shared/components/share-dropdown/share-dropdown.component';
+import { SharePlatform } from '../../core/constants/share.constants';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ShareDropdownComponent],
   template: `
     <div class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white p-6">
+
+      <!-- Share clipboard toast -->
+      @if (shareNotification()) {
+        <div
+          class="fixed bottom-5 right-5 z-50 flex items-center gap-3 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium px-5 py-3 rounded-xl shadow-2xl border border-gray-700 dark:border-gray-300 animate-fade-in"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="text-lg leading-none" aria-hidden="true">📋</span>
+          <span>{{ shareNotification() }}</span>
+        </div>
+      }
+
       <div class="max-w-5xl mx-auto">
         <h2 class="text-3xl font-bold mb-4">Your GitHub Story</h2>
         <p class="text-gray-600 dark:text-gray-400 mb-8">
@@ -146,7 +162,8 @@ import { ThemeService } from '../../core/services/theme.service';
             </div>
 
             @if (generatedStory()) {
-              <div class="flex justify-end">
+              <div class="flex justify-end gap-2">
+                <app-share-dropdown [onShare]="storyShareHandler"></app-share-dropdown>
                 <button
                   class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
                   [disabled]="isDownloading()"
@@ -252,7 +269,8 @@ import { ThemeService } from '../../core/services/theme.service';
           </div>
 
           @if (timelineData() && !isLoadingTimeline()) {
-            <div class="flex justify-end">
+            <div class="flex justify-end gap-2">
+              <app-share-dropdown [onShare]="timelineShareHandler"></app-share-dropdown>
               <button
                 class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
                 [disabled]="isDownloadingTimeline()"
@@ -280,6 +298,26 @@ export class DashboardComponent {
   protected readonly authService = inject(AuthService);
   private readonly storyService = inject(StoryService);
   private readonly themeService = inject(ThemeService);
+  private readonly shareService = inject(ShareService);
+
+  // Bound callbacks passed as @Input to ShareDropdownComponent
+  readonly storyShareHandler = async (platform: SharePlatform): Promise<void> => {
+    if (!this.shareCard) return;
+    const bg = this.themeService.isDark() ? '#171717' : '#F6F6F1';
+    const result = await this.shareService.shareWithImage(
+      this.shareCard.nativeElement, platform, 'story', this.selectedGenre(), bg,
+    );
+    this.showShareToast(result);
+  };
+
+  readonly timelineShareHandler = async (platform: SharePlatform): Promise<void> => {
+    if (!this.timelineCard) return;
+    const bg = this.themeService.isDark() ? '#171717' : '#F6F6F1';
+    const result = await this.shareService.shareWithImage(
+      this.timelineCard.nativeElement, platform, 'timeline', undefined, bg,
+    );
+    this.showShareToast(result);
+  };
 
   readonly genres = GENRES;
   readonly languages = LANGUAGES;
@@ -297,6 +335,7 @@ export class DashboardComponent {
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
   readonly generatedStory = signal<StoryResponse | null>(null);
   readonly memberSinceYear = signal<number | null>(null);
+  readonly shareNotification = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -305,6 +344,14 @@ export class DashboardComponent {
         this.memberSinceYear.set(new Date(createdAt).getFullYear());
       }
     });
+  }
+
+  private showShareToast(result: ShareResult): void {
+    const msg = result === 'clipboard'
+      ? '📋 Image copied! Paste it (Ctrl+V / ⌘V) into your post on the platform.'
+      : '🔗 Opening platform — share your CommitStory!';
+    this.shareNotification.set(msg);
+    setTimeout(() => this.shareNotification.set(null), 5000);
   }
 
   setViewMode(mode: 'story' | 'timeline'): void {
