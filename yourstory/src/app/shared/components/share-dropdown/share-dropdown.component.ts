@@ -53,7 +53,7 @@ const PLATFORMS: PlatformOption[] = [
       <!-- Dropdown menu -->
       @if (open()) {
         <div
-          class="absolute right-0 bottom-full mb-2 w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl z-50 overflow-hidden"
+          class="fixed bottom-4 left-4 right-4 w-auto sm:absolute sm:bottom-full sm:mb-2 sm:left-auto sm:right-0 sm:w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl z-50 overflow-hidden"
           role="menu"
         >
           <!-- Clipboard hint -->
