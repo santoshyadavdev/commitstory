@@ -1,8 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
-
-const GITHUB_PATH =
-  'M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.505.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.607.069-.607 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.338 4.695-4.566 4.944.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.2 22 16.447 22 12.021 22 6.484 17.523 2 12 2z';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-login',
@@ -19,6 +17,22 @@ const GITHUB_PATH =
   ],
   template: `
     <div class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white overflow-x-hidden">
+      <button
+        (click)="themeService.toggle()"
+        class="fixed top-5 right-5 z-50 w-10 h-10 flex items-center justify-center rounded-lg text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white bg-white/80 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700 transition-colors cursor-pointer"
+        [attr.aria-label]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+        [attr.title]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+      >
+        @if (themeService.isDark()) {
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m14.95 6.95-.7-.7M6.05 6.05l-.7-.7m12.02 0-.7.7M6.05 17.95l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z" />
+          </svg>
+        } @else {
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+          </svg>
+        }
+      </button>
 
       <!-- Decorative gradient background orbs -->
       <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -34,15 +48,8 @@ const GITHUB_PATH =
       >
         <!-- Brand mark -->
         <div class="flex items-center gap-3 mb-12 animate-fade-in">
-          <svg
-            class="w-10 h-10 text-white"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
-          </svg>
+          <img src="/coderabbit-icon-dark.svg" alt="CodeRabbit logo" class="w-10 h-10 block dark:hidden" />
+          <img src="/coderabbit-icon-light.svg" alt="CodeRabbit logo" class="w-10 h-10 hidden dark:block" />
           <span class="text-2xl font-bold tracking-tight">CommitStory</span>
         </div>
 
@@ -79,15 +86,8 @@ const GITHUB_PATH =
             class="relative flex items-center gap-3 bg-white hover:bg-gray-100 text-gray-900 font-bold py-4 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 shadow-2xl cursor-pointer"
             aria-label="Sign in with GitHub to start generating your story"
           >
-            <svg
-              class="w-6 h-6"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
-            </svg>
+            <img src="/coderabbit-icon-dark.svg" alt="CodeRabbit logo" class="w-6 h-6 block dark:hidden" />
+            <img src="/coderabbit-icon-light.svg" alt="CodeRabbit logo" class="w-6 h-6 hidden dark:block" />
             Sign in with GitHub &mdash; It&apos;s Free
           </button>
         </div>
@@ -303,15 +303,8 @@ const GITHUB_PATH =
             <div
               class="flex items-center gap-3 bg-white/60 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-xl px-5 py-3 transition-all duration-300 hover:border-gray-400/50 hover:bg-gray-100/80 dark:hover:bg-gray-900/80 hover:scale-105"
             >
-              <svg
-                class="w-6 h-6 text-gray-600 dark:text-gray-300"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
-              </svg>
+              <img src="/coderabbit-icon-dark.svg" alt="CodeRabbit logo" class="w-6 h-6 block dark:hidden" />
+              <img src="/coderabbit-icon-light.svg" alt="CodeRabbit logo" class="w-6 h-6 hidden dark:block" />
               <div>
                 <div class="font-semibold text-gray-900 dark:text-white text-sm">GitHub GraphQL API</div>
                 <div class="text-gray-500 dark:text-gray-500 text-xs">Rich contribution data</div>
@@ -370,15 +363,8 @@ const GITHUB_PATH =
       >
         <div class="max-w-2xl mx-auto text-center">
           <div class="flex items-center justify-center gap-3 mb-4">
-            <svg
-              class="w-8 h-8 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
-            </svg>
+            <img src="/coderabbit-icon-dark.svg" alt="CodeRabbit logo" class="w-8 h-8 block dark:hidden" />
+            <img src="/coderabbit-icon-light.svg" alt="CodeRabbit logo" class="w-8 h-8 hidden dark:block" />
             <h2 class="text-2xl font-bold">Ready to Tell Your Story?</h2>
           </div>
 
@@ -391,15 +377,7 @@ const GITHUB_PATH =
             class="inline-flex items-center gap-3 bg-gradient-to-r from-coderabbit-orange via-coderabbit-pink to-coderabbit-aquamarine hover:from-coderabbit-orange/90 hover:via-coderabbit-pink/90 hover:to-coderabbit-aquamarine/90 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 shadow-2xl shadow-coderabbit-orange/25 cursor-pointer"
             aria-label="Get started free by signing in with GitHub"
           >
-            <svg
-              class="w-6 h-6"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path fill-rule="evenodd" [attr.d]="githubPath" clip-rule="evenodd" />
-            </svg>
+            <img src="/coderabbit-icon-light.svg" alt="CodeRabbit logo" class="w-6 h-6" />
             Get Started Free with GitHub
           </button>
 
@@ -414,5 +392,5 @@ const GITHUB_PATH =
 })
 export class LoginComponent {
   protected readonly authService = inject(AuthService);
-  protected readonly githubPath = GITHUB_PATH;
+  protected readonly themeService = inject(ThemeService);
 }
