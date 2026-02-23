@@ -348,7 +348,14 @@ import { ThemeService } from '../../core/services/theme.service';
             Built with
             <span class="animate-pulse text-pink-400" aria-label="love">&#10084;&#65039;</span>
             by
-            <span class="text-gray-700 dark:text-gray-300 font-medium">CodeRabbit Issue Planner</span>,
+            <a
+              href="https://www.coderabbit.ai/issue-planner"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-gray-700 dark:text-gray-300 font-medium underline decoration-coderabbit-orange/60 underline-offset-2 hover:text-coderabbit-orange transition-colors"
+            >
+              CodeRabbit Issue Planner
+            </a>,
             <span class="text-gray-700 dark:text-gray-300 font-medium">GitHub Copilot</span>
             and
             <span class="text-gray-700 dark:text-gray-300 font-medium">Gemini</span>
