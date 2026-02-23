@@ -169,7 +169,7 @@ async function handleGitHubAuth(
   const params = new URLSearchParams({
     client_id: env.GITHUB_CLIENT_ID,
     redirect_uri: env.GITHUB_CALLBACK_URL,
-    scope: 'read:user',
+    scope: 'read:user read:org',
     state,
   });
 
@@ -1045,9 +1045,10 @@ const angularApp = new AngularAppEngine();
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const { pathname: path, protocol } = url;
+    const { pathname: path, protocol, hostname } = url;
     const method = request.method;
-    const isSecure = protocol === 'https:';
+    // Force insecure cookies on localhost to prevent browser from blocking them
+    const isSecure = protocol === 'https:' && !hostname.includes('localhost') && !hostname.includes('127.0.0.1');
 
     // Validate required secrets at runtime (fail-fast)
     if (!env.SESSION_SECRET) {
