@@ -1,4 +1,5 @@
-import { Component, ElementRef, ViewChild, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
@@ -13,7 +14,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, ShareDropdownComponent],
+  imports: [FormsModule, DecimalPipe, ShareDropdownComponent],
   template: `
     <div class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white p-6">
 
@@ -38,6 +39,16 @@ import { SharePlatform } from '../../core/constants/share.constants';
         <div class="inline-flex bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-1 mb-8">
           <button
             class="px-4 py-2 text-sm rounded-md transition-colors"
+            [class.bg-coderabbit-orange]="viewMode() === 'timeline'"
+            [class.text-white]="viewMode() === 'timeline'"
+            [class.text-gray-600]="viewMode() !== 'timeline'"
+            [class.dark:text-gray-300]="viewMode() !== 'timeline'"
+            (click)="onViewTimeline()"
+          >
+            Timeline
+          </button>
+          <button
+            class="px-4 py-2 text-sm rounded-md transition-colors"
             [class.bg-coderabbit-orange]="viewMode() === 'story'"
             [class.text-white]="viewMode() === 'story'"
             [class.text-gray-600]="viewMode() !== 'story'"
@@ -45,16 +56,6 @@ import { SharePlatform } from '../../core/constants/share.constants';
             (click)="setViewMode('story')"
           >
             Generate Story
-          </button>
-          <button
-            class="px-4 py-2 text-sm rounded-md transition-colors"
-            [class.bg-coderabbit-orange]="viewMode() === 'timeline'"
-            [class.text-white]="viewMode() === 'timeline'"
-            [class.text-gray-600]="viewMode() !== 'timeline'"
-            [class.dark:text-gray-300]="viewMode() !== 'timeline'"
-            (click)="onViewTimeline()"
-          >
-            View Timeline
           </button>
         </div>
 
@@ -192,83 +193,278 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           }
 
-          <div #timelineCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
-            <div class="flex items-center justify-between mb-5">
-              <h3 class="text-xl font-semibold text-coderabbit-orange">Developer Milestone Timeline</h3>
-              <span class="text-xs text-gray-500 dark:text-gray-500">commitstory</span>
+          <div #timelineCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-coderabbit-orange to-amber-500 flex items-center justify-center shadow-md">
+                  <span class="text-white text-lg">🗓️</span>
+                </div>
+                <div>
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white">Developer Timeline</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Your journey on GitHub — scroll to explore</p>
+                </div>
+              </div>
+              <span class="text-xs text-gray-400 dark:text-gray-600 font-mono">commitstory</span>
             </div>
 
+            <!-- Filter Chips -->
+            @if (timelineData()) {
+              <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Filters</span>
+                  <div class="flex gap-3">
+                    <button
+                      class="text-xs font-medium text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
+                      (click)="selectAllFilters()"
+                    >All</button>
+                    <button
+                      class="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      (click)="clearAllFilters()"
+                    >None</button>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterAccountCreated()
+                      ? 'bg-orange-50 dark:bg-orange-950/40 border-coderabbit-orange/50 text-coderabbit-orange shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterAccountCreated.set(!filterAccountCreated())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-coderabbit-orange" [class.opacity-30]="!filterAccountCreated()"></span>
+                    Account
+                  </button>
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterFirstPR()
+                      ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-400/50 text-violet-600 dark:text-violet-400 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterFirstPR.set(!filterFirstPR())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-violet-500" [class.opacity-30]="!filterFirstPR()"></span>
+                    First PR
+                  </button>
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterFirstIssue()
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400/50 text-amber-600 dark:text-amber-400 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterFirstIssue.set(!filterFirstIssue())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-amber-500" [class.opacity-30]="!filterFirstIssue()"></span>
+                    Issues
+                  </button>
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterFirstDiscussion()
+                      ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-400/50 text-teal-600 dark:text-teal-400 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterFirstDiscussion.set(!filterFirstDiscussion())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-teal-500" [class.opacity-30]="!filterFirstDiscussion()"></span>
+                    Discussions
+                  </button>
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterPRMilestones()
+                      ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-400/50 text-violet-600 dark:text-violet-400 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterPRMilestones.set(!filterPRMilestones())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-violet-500" [class.opacity-30]="!filterPRMilestones()"></span>
+                    PR Milestones
+                  </button>
+                  <button
+                    class="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200"
+                    [class]="filterCommitMilestones()
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400/50 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600'"
+                    (click)="filterCommitMilestones.set(!filterCommitMilestones())"
+                  >
+                    <span class="w-2 h-2 rounded-full bg-emerald-500" [class.opacity-30]="!filterCommitMilestones()"></span>
+                    Commits
+                  </button>
+                </div>
+              </div>
+            }
+
             @if (isLoadingTimeline()) {
-              <div class="flex items-center gap-3 text-gray-600 dark:text-gray-300 py-8">
-                <div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-coderabbit-orange"></div>
-                <span>Loading timeline milestones…</span>
+              <div class="flex flex-col items-center gap-4 py-16">
+                <div class="relative">
+                  <div class="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-700 border-t-coderabbit-orange"></div>
+                </div>
+                <span class="text-sm text-gray-500 dark:text-gray-400">Loading your timeline…</span>
               </div>
             } @else if (timelineData(); as timeline) {
               @if (timeline.events.length > 0) {
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalCommits }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Commits</p>
+                <!-- Stats Row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+                  <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ timeline.totalCommits | number }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Commits</p>
                   </div>
-                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalPullRequests }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Total PRs</p>
+                  <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 to-violet-600"></div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ timeline.totalPullRequests | number }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Pull Requests</p>
                   </div>
-                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalIssues }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Issues</p>
+                  <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-amber-600"></div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ timeline.totalIssues | number }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Issues</p>
                   </div>
-                  <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center">
-                    <p class="text-lg font-bold text-gray-900 dark:text-white">{{ timeline.totalDiscussions }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Discussions</p>
+                  <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 to-teal-600"></div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ timeline.totalDiscussions | number }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Discussions</p>
                   </div>
                 </div>
 
-                <div class="relative">
-                  <div class="absolute left-5 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-700"></div>
-                  @for (milestone of timeline.events; track milestone.type + '-' + (milestone.count ?? 0) + '-' + (milestone.date ?? 'none')) {
-                    <div class="relative pl-12 pb-6 last:pb-0">
-                      <div
-                        class="absolute left-0 top-1 z-10 w-10 h-10 rounded-full border flex items-center justify-center text-xl leading-none"
-                        [class.bg-coderabbit-orange/20]="!milestone.count"
-                        [class.border-coderabbit-orange/40]="!milestone.count"
-                        [class.bg-emerald-500/20]="!!milestone.count"
-                        [class.border-emerald-500/40]="!!milestone.count"
-                        aria-hidden="true"
-                      >{{ getMilestoneIcon(milestone.type) }}</div>
+                <!-- Horizontal Swim-Lane Timeline -->
+                @if (filteredTimelineEvents().length > 0) {
+                  <div class="overflow-x-auto -mx-6 md:-mx-8 px-6 md:px-8 timeline-scroll">
+                    <div class="relative inline-flex min-w-max" style="height: 480px;">
+                      <!-- Spine line -->
+                      <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
 
-                      <div class="bg-gray-100/80 dark:bg-gray-800/70 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                        <div class="flex flex-wrap items-center gap-2 mb-2">
-                          <h4 class="text-base font-semibold text-gray-900 dark:text-white">{{ milestone.title }}</h4>
-                          @if (milestone.count) {
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-600/30 text-emerald-200">
-                              {{ milestone.count }}
-                            </span>
+                      @for (milestone of filteredTimelineEvents(); track milestone.type + '-' + (milestone.count ?? 0) + '-' + (milestone.date ?? 'none'); let i = $index) {
+                        <div class="relative" style="width: 100px; height: 100%;">
+
+                          <!-- Year separator -->
+                          @if (i === 0 || getMilestoneYear(milestone) !== getMilestoneYear(filteredTimelineEvents()[i - 1])) {
+                            <!-- Vertical dashed line spanning the full height -->
+                            <div class="absolute top-0 bottom-0 left-0 w-px border-l border-dashed border-gray-300 dark:border-gray-600 z-10"></div>
+                            <!-- Year badge pinned at top-left outside the node area -->
+                            <div class="absolute -top-0 left-0 -translate-x-1/2 z-30">
+                              <span class="text-[10px] font-bold uppercase tracking-widest text-white bg-gray-400 dark:bg-gray-600 px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap">
+                                {{ getMilestoneYear(milestone) }}
+                              </span>
+                            </div>
                           }
-                        </div>
-                        <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">{{ milestone.description }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ formatMilestoneDate(milestone) }}</p>
-                        @if (milestone.url) {
-                          <a
-                            [href]="milestone.url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-block mt-2 text-xs text-coderabbit-orange hover:text-coderabbit-orange/80"
+
+                          <!-- Horizontal connector at spine (left) -->
+                          @if (i > 0) {
+                            <div class="absolute top-1/2 left-0 w-1/2 h-px -translate-y-1/2 bg-gray-200 dark:bg-gray-700"></div>
+                          }
+                          <!-- Horizontal connector at spine (right) -->
+                          @if (i < filteredTimelineEvents().length - 1) {
+                            <div class="absolute top-1/2 right-0 w-1/2 h-px -translate-y-1/2 bg-gray-200 dark:bg-gray-700"></div>
+                          }
+
+                          <!-- Dot on spine -->
+                          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 z-10"></div>
+
+                          <!-- Vertical stem from spine to node -->
+                          <div
+                            class="absolute left-1/2 -translate-x-1/2 w-px"
+                            [class]="getMilestoneAccentClasses(milestone.type) + ' opacity-40'"
+                            [style.top.%]="getStemTop(milestone.type)"
+                            [style.height.%]="getStemHeight(milestone.type)"
+                          ></div>
+
+                          <!-- Node group at lane position -->
+                          <div
+                            class="absolute flex flex-col items-center z-20"
+                            [style.top.%]="getMilestoneLanePercent(milestone.type)"
+                            [style.left]="'50%'"
+                            [style.transform]="'translate(-50%, -50%)'"
                           >
-                            View on GitHub ↗
-                          </a>
-                        }
+                            <button
+                              class="w-11 h-11 rounded-full flex items-center justify-center text-lg shadow-lg ring-4 ring-white dark:ring-gray-900 transition-all duration-300 cursor-pointer"
+                              [class]="getMilestoneNodeClasses(milestone.type) + (expandedMilestone() === i ? ' scale-125 ring-coderabbit-orange/40' : ' hover:scale-110')"
+                              (click)="toggleMilestone(i)"
+                              [attr.aria-expanded]="expandedMilestone() === i"
+                              [attr.aria-label]="milestone.title"
+                            >{{ getMilestoneIcon(milestone.type) }}</button>
+
+                            <p class="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mt-1.5 text-center leading-tight max-w-[90px] line-clamp-2">
+                              {{ milestone.title }}
+                            </p>
+                          </div>
+
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Scroll hint -->
+                  <div class="flex items-center justify-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500">
+                    <span>←</span>
+                    <span>Scroll to explore</span>
+                    <span>→</span>
+                  </div>
+
+                  <!-- Detail panel for selected milestone -->
+                  @if (selectedMilestoneDetail(); as milestone) {
+                    <div class="mt-4 animate-fade-in">
+                      <div
+                        class="relative overflow-hidden rounded-2xl p-5 border shadow-lg"
+                        [class]="getMilestoneCardClasses(milestone.type)"
+                      >
+                        <div
+                          class="absolute top-0 left-0 right-0 h-1"
+                          [class]="getMilestoneAccentClasses(milestone.type)"
+                        ></div>
+
+                        <div class="flex items-start gap-3 mt-1">
+                          <span class="text-3xl">{{ getMilestoneIcon(milestone.type) }}</span>
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                              <h4 class="text-base font-bold text-gray-900 dark:text-white">{{ milestone.title }}</h4>
+                              @if (milestone.count) {
+                                <span
+                                  class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                  [class]="getMilestoneBadgeClasses(milestone.type)"
+                                >{{ milestone.count | number }}</span>
+                              }
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2">{{ milestone.description }}</p>
+                            <div class="flex items-center gap-4 mt-3">
+                              <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                                {{ formatMilestoneDate(milestone) }}
+                              </span>
+                              @if (milestone.url) {
+                                <a
+                                  [href]="milestone.url"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  class="inline-flex items-center gap-1 text-xs font-medium text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
+                                >
+                                  View on GitHub ↗
+                                </a>
+                              }
+                            </div>
+                          </div>
+                          <button
+                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-lg leading-none p-1"
+                            (click)="toggleMilestone(expandedMilestone()!)"
+                            aria-label="Close details"
+                          >✕</button>
+                        </div>
                       </div>
                     </div>
                   }
-                </div>
+                } @else {
+                  <div class="py-12 text-center">
+                    <p class="text-sm text-gray-400 dark:text-gray-500">No events match the selected filters.</p>
+                    <button
+                      class="mt-2 text-xs text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
+                      (click)="selectAllFilters()"
+                    >Show all events</button>
+                  </div>
+                }
               } @else {
-                <div class="py-8 text-center text-gray-500 dark:text-gray-400">
+                <div class="py-12 text-center text-gray-500 dark:text-gray-400">
                   {{ timelineMessage() || 'No milestone data available yet.' }}
                 </div>
               }
             } @else {
-              <div class="py-8 text-center text-gray-500 dark:text-gray-400">Select View Timeline to load your milestones.</div>
+              <div class="py-12 text-center text-gray-400 dark:text-gray-500">
+                <p class="text-lg mb-1">🗓️</p>
+                <p class="text-sm">Loading your milestone history…</p>
+              </div>
             }
           </div>
 
@@ -326,7 +522,8 @@ export class DashboardComponent {
   readonly genres = GENRES;
   readonly languages = LANGUAGES;
 
-  readonly viewMode = signal<'story' | 'timeline'>('story');
+  readonly viewMode = signal<'story' | 'timeline'>('timeline');
+  readonly expandedMilestone = signal<number | null>(null);
   readonly selectedGenre = signal<string>(GENRES[0] as string);
   readonly selectedLanguage = signal<string>(LANGUAGES[0] as string);
   readonly isGenerating = signal(false);
@@ -341,6 +538,46 @@ export class DashboardComponent {
   readonly memberSinceYear = signal<number | null>(null);
   readonly shareNotification = signal<string | null>(null);
 
+  // Timeline filters
+  readonly filterAccountCreated = signal(true);
+  readonly filterFirstPR = signal(true);
+  readonly filterFirstIssue = signal(true);
+  readonly filterFirstDiscussion = signal(true);
+  readonly filterPRMilestones = signal(true);
+  readonly filterCommitMilestones = signal(true);
+
+  // Computed filtered timeline events
+  readonly filteredTimelineEvents = computed(() => {
+    const timeline = this.timelineData();
+    if (!timeline) return [];
+
+    return timeline.events.filter((event) => {
+      switch (event.type) {
+        case MilestoneType.account_created:
+          return this.filterAccountCreated();
+        case MilestoneType.first_pr:
+          return this.filterFirstPR();
+        case MilestoneType.first_issue:
+          return this.filterFirstIssue();
+        case MilestoneType.first_discussion:
+          return this.filterFirstDiscussion();
+        case MilestoneType.pr_count:
+          return this.filterPRMilestones();
+        case MilestoneType.commit_count:
+          return this.filterCommitMilestones();
+        default:
+          return true;
+      }
+    });
+  });
+
+  readonly selectedMilestoneDetail = computed(() => {
+    const idx = this.expandedMilestone();
+    if (idx === null) return null;
+    const events = this.filteredTimelineEvents();
+    return idx < events.length ? events[idx] : null;
+  });
+
   constructor() {
     effect(() => {
       const createdAt = this.authService.user()?.created_at;
@@ -348,6 +585,13 @@ export class DashboardComponent {
         this.memberSinceYear.set(new Date(createdAt).getFullYear());
       }
     });
+
+    // Auto-load timeline since it's the default view
+    this.onViewTimeline();
+  }
+
+  toggleMilestone(index: number): void {
+    this.expandedMilestone.set(this.expandedMilestone() === index ? null : index);
   }
 
   private showShareToast(result: ShareResult): void {
@@ -392,6 +636,24 @@ export class DashboardComponent {
         this.isLoadingTimeline.set(false);
       },
     });
+  }
+
+  selectAllFilters(): void {
+    this.filterAccountCreated.set(true);
+    this.filterFirstPR.set(true);
+    this.filterFirstIssue.set(true);
+    this.filterFirstDiscussion.set(true);
+    this.filterPRMilestones.set(true);
+    this.filterCommitMilestones.set(true);
+  }
+
+  clearAllFilters(): void {
+    this.filterAccountCreated.set(false);
+    this.filterFirstPR.set(false);
+    this.filterFirstIssue.set(false);
+    this.filterFirstDiscussion.set(false);
+    this.filterPRMilestones.set(false);
+    this.filterCommitMilestones.set(false);
   }
 
   onGenerateStory(): void {
@@ -454,6 +716,96 @@ export class DashboardComponent {
       month: 'long',
       day: 'numeric',
     });
+  }
+
+  getMilestoneYear(milestone: MilestoneEvent): string {
+    if (!milestone.date) return 'Unknown';
+    return new Date(milestone.date).getFullYear().toString();
+  }
+
+  getMilestoneLanePercent(type: MilestoneType): number {
+    switch (type) {
+      case MilestoneType.account_created: return 16;
+      case MilestoneType.first_pr: return 30;
+      case MilestoneType.first_issue: return 42;
+      case MilestoneType.first_discussion: return 58;
+      case MilestoneType.pr_count: return 70;
+      case MilestoneType.commit_count: return 84;
+      default: return 50;
+    }
+  }
+
+  getStemTop(type: MilestoneType): number {
+    return Math.min(this.getMilestoneLanePercent(type), 50);
+  }
+
+  getStemHeight(type: MilestoneType): number {
+    return Math.abs(this.getMilestoneLanePercent(type) - 50);
+  }
+
+  getMilestoneNodeClasses(type: MilestoneType): string {
+    switch (type) {
+      case MilestoneType.account_created:
+        return 'bg-gradient-to-br from-orange-400 to-coderabbit-orange text-white';
+      case MilestoneType.first_pr:
+      case MilestoneType.pr_count:
+        return 'bg-gradient-to-br from-violet-400 to-violet-600 text-white';
+      case MilestoneType.first_issue:
+        return 'bg-gradient-to-br from-amber-400 to-amber-600 text-white';
+      case MilestoneType.first_discussion:
+        return 'bg-gradient-to-br from-teal-400 to-teal-600 text-white';
+      case MilestoneType.commit_count:
+        return 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white';
+      default:
+        return 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+    }
+  }
+
+  getMilestoneCardClasses(type: MilestoneType): string {
+    switch (type) {
+      case MilestoneType.account_created:
+        return 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/60 dark:border-orange-900/40';
+      case MilestoneType.first_pr:
+      case MilestoneType.pr_count:
+        return 'bg-violet-50/50 dark:bg-violet-950/20 border-violet-200/60 dark:border-violet-900/40';
+      case MilestoneType.first_issue:
+        return 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-900/40';
+      case MilestoneType.first_discussion:
+        return 'bg-teal-50/50 dark:bg-teal-950/20 border-teal-200/60 dark:border-teal-900/40';
+      case MilestoneType.commit_count:
+        return 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-900/40';
+      default:
+        return 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700';
+    }
+  }
+
+  getMilestoneAccentClasses(type: MilestoneType): string {
+    switch (type) {
+      case MilestoneType.account_created:
+        return 'bg-coderabbit-orange';
+      case MilestoneType.first_pr:
+      case MilestoneType.pr_count:
+        return 'bg-violet-500';
+      case MilestoneType.first_issue:
+        return 'bg-amber-500';
+      case MilestoneType.first_discussion:
+        return 'bg-teal-500';
+      case MilestoneType.commit_count:
+        return 'bg-emerald-500';
+      default:
+        return 'bg-gray-400';
+    }
+  }
+
+  getMilestoneBadgeClasses(type: MilestoneType): string {
+    switch (type) {
+      case MilestoneType.pr_count:
+        return 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300';
+      case MilestoneType.commit_count:
+        return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
+      default:
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+    }
   }
 
   async downloadAsImage(): Promise<void> {

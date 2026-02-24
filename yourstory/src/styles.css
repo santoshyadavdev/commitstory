@@ -26,3 +26,37 @@
     @apply bg-coderabbit-neutral text-white;
   }
 }
+
+/* Horizontal timeline scrollbar */
+.timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.gray.300') transparent;
+}
+
+.timeline-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background-color: theme('colors.gray.300');
+  border-radius: 3px;
+}
+
+html.dark .timeline-scroll {
+  scrollbar-color: theme('colors.gray.700') transparent;
+}
+
+html.dark .timeline-scroll::-webkit-scrollbar-thumb {
+  background-color: theme('colors.gray.700');
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
