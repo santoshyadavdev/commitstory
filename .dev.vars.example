@@ -10,6 +10,10 @@ SESSION_SECRET=
 # Obtain from: https://aistudio.google.com/app/apikey
 GOOGLE_AI_API_KEY=
 
+# Feature flag for story image generation endpoint.
+# Set to false / 0 / off / no to disable generated story images.
+ENABLE_STORY_IMAGE_GENERATION=true
+
 # GitHub OAuth App client ID.
 # Create an OAuth App at: https://github.com/settings/developers
 GITHUB_CLIENT_ID=

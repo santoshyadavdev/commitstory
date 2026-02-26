@@ -11,13 +11,14 @@
  */
 
 import { AngularAppEngine } from '@angular/ssr';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Env {
   SESSION_SECRET: string;
   GOOGLE_AI_API_KEY: string;
+  ENABLE_STORY_IMAGE_GENERATION?: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   GITHUB_CALLBACK_URL: string;
@@ -150,6 +151,68 @@ function json(data: unknown, status = 200): Response {
 
 function redirect(url: string, status = 302): Response {
   return new Response(null, { status, headers: { Location: url } });
+}
+
+function isStoryImageGenerationEnabled(env: Env): boolean {
+  const value = env.ENABLE_STORY_IMAGE_GENERATION?.trim().toLowerCase();
+  if (!value) return true;
+  return !['0', 'false', 'off', 'no'].includes(value);
+}
+
+type GenAIInlineData = {
+  data?: string;
+  mimeType?: string;
+  mime_type?: string;
+};
+
+type GenAIPart = {
+  text?: string;
+  inlineData?: GenAIInlineData;
+  inline_data?: GenAIInlineData;
+};
+
+type GenAICandidate = {
+  content?: {
+    parts?: GenAIPart[];
+  };
+};
+
+type GenAIResponseLike = {
+  text?: string | (() => string);
+  candidates?: GenAICandidate[];
+  response?: GenAIResponseLike;
+};
+
+function extractTextFromGenAI(result: unknown): string {
+  const response = ((result as GenAIResponseLike | undefined)?.response ?? result) as GenAIResponseLike;
+
+  if (typeof response?.text === 'function') {
+    return response.text().trim();
+  }
+  if (typeof response?.text === 'string') {
+    return response.text.trim();
+  }
+
+  const parts = response?.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
+  const text = parts.map((part) => part.text).filter((value): value is string => typeof value === 'string').join('');
+  return text.trim();
+}
+
+function extractInlineImageData(result: unknown): { data: string; mimeType: string } | null {
+  const response = ((result as GenAIResponseLike | undefined)?.response ?? result) as GenAIResponseLike;
+  const parts = response?.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
+
+  for (const part of parts) {
+    const inline = part.inlineData ?? part.inline_data;
+    if (inline?.data) {
+      return {
+        data: inline.data,
+        mimeType: inline.mimeType ?? inline.mime_type ?? 'image/png',
+      };
+    }
+  }
+
+  return null;
 }
 
 // ─── Route Handlers ───────────────────────────────────────────────────────────
@@ -930,7 +993,7 @@ async function handleGenerateStory(
   if (!apiKey) return json({ error: 'AI story generation is not configured' }, 503);
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenAI({ apiKey });
     const username = session.user.login;
 
     const memberSince = createdAt ?? session.user.created_at;
@@ -1005,17 +1068,20 @@ async function handleGenerateStory(
         : []),
     ].join('\n');
 
-    const model = genAI.getGenerativeModel({
+    const result = await genAI.models.generateContent({
       model: 'gemini-2.0-flash-lite',
-      systemInstruction,
+      contents: userPrompt,
+      config: {
+        systemInstruction,
+        maxOutputTokens: 700,
+        temperature: 0.7,
+      },
     });
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      generationConfig: { maxOutputTokens: 700, temperature: 0.7 },
-    });
-
-    const rawResponse = result.response.text().trim();
+    const rawResponse = extractTextFromGenAI(result);
+    if (!rawResponse) {
+      return json({ error: 'Failed to generate story' }, 500);
+    }
     const titleAndStoryMatch = rawResponse.match(/TITLE:\s*([\s\S]*?)\nSTORY:\s*([\s\S]*)/i);
 
     const fallbackTitleByLanguage: Record<string, string> = {
@@ -1031,10 +1097,106 @@ async function handleGenerateStory(
     const parsedTitle = titleAndStoryMatch?.[1]?.trim() || fallbackTitle;
     const parsedStory = titleAndStoryMatch?.[2]?.trim() || rawResponse;
 
-    return json({ title: parsedTitle, story: parsedStory, genre, label: 'Career Summary' });
+    return json({
+      title: parsedTitle,
+      story: parsedStory,
+      genre,
+      label: 'Career Summary',
+      imageGenerationEnabled: isStoryImageGenerationEnabled(env),
+    });
   } catch (err) {
     console.error('Story generation error:', err);
     return json({ error: 'Failed to generate story' }, 500);
+  }
+}
+
+/**
+ * POST /api/stories/generate-image
+ */
+async function handleGenerateStoryImage(
+  request: Request,
+  env: Env,
+  session: SessionData,
+): Promise<Response> {
+  if (!session.accessToken || !session.user) {
+    return json({ error: 'Not authenticated' }, 401);
+  }
+
+  const { genre, storyTitle, username, stats } = (await request.json()) as {
+    genre?: unknown;
+    storyTitle?: unknown;
+    username?: unknown;
+    stats?: Record<string, unknown>;
+  };
+
+  if (typeof genre !== 'string' || !genre.trim()) {
+    return json({ error: 'genre must be a non-empty string' }, 400);
+  }
+  if (typeof storyTitle !== 'string' || !storyTitle.trim()) {
+    return json({ error: 'storyTitle must be a non-empty string' }, 400);
+  }
+  if (typeof username !== 'string' || !username.trim()) {
+    return json({ error: 'username must be a non-empty string' }, 400);
+  }
+
+  if (!isStoryImageGenerationEnabled(env)) {
+    return json({ error: 'Story image generation is disabled' }, 503);
+  }
+
+  const apiKey = env.GOOGLE_AI_API_KEY;
+  if (!apiKey) return json({ error: 'AI story generation is not configured' }, 503);
+
+  try {
+    const genAI = new GoogleGenAI({ apiKey });
+    const statsText = Object.entries(stats ?? {})
+      .filter(([, value]) => typeof value === 'number')
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(', ');
+
+    const genreStyleGuide: Record<string, string> = {
+      Drama: 'cinematic dramatic lighting, moody atmosphere, rich contrast',
+      Biography: 'editorial documentary style, grounded and reflective mood, textured details',
+      Comedy: 'playful composition, bright warm palette, lighthearted visual rhythm',
+      Adventure: 'dynamic composition, vibrant colors, sense of motion and discovery',
+      Thriller: 'high contrast, suspenseful shadows, mysterious abstract symbolism',
+      'Sci-Fi': 'futuristic abstract forms, neon accents, atmospheric glow',
+      Documentary: 'clean realistic textures, balanced tones, storytelling through objects',
+      Sports: 'energetic composition, bold colors, momentum and impact cues',
+    };
+
+    const prompt = [
+      'Create a thematic cinematic header illustration for a developer story card.',
+      `Story title: ${storyTitle}.`,
+      `Genre: ${genre}.`,
+      `Creator username: ${username}.`,
+      statsText ? `Contribution metrics: ${statsText}.` : '',
+      `Art direction: ${genreStyleGuide[genre] ?? 'cinematic abstract digital illustration with strong visual storytelling'}.`,
+      'Use abstract and symbolic elements (code, constellations of commits, pull-request pathways, issue markers).',
+      'Do not generate human faces, portraits, or specific real people.',
+      'No text, logos, watermarks, or UI overlays inside the image.',
+      'Target composition: widescreen story hero image, 16:9 framing, high quality details.',
+    ].filter(Boolean).join(' ');
+
+    const result = await genAI.models.generateContent({
+      model: 'gemini-3.1-flash-image-preview',
+      contents: prompt,
+      config: {
+        responseModalities: ['IMAGE'],
+        imageConfig: {
+          aspectRatio: '16:9',
+        },
+      },
+    });
+
+    const imageData = extractInlineImageData(result);
+    if (!imageData) {
+      throw new Error('No image data returned by model');
+    }
+
+    return json({ imageUrl: `data:${imageData.mimeType};base64,${imageData.data}` });
+  } catch (err) {
+    console.error('Story image generation error:', err);
+    return json({ error: 'Failed to generate story image' }, 500);
   }
 }
 
@@ -1085,6 +1247,8 @@ export default {
       response = await handleMilestones(request, session);
     } else if (path === '/api/stories/generate' && method === 'POST') {
       response = await handleGenerateStory(request, env, session);
+    } else if (path === '/api/stories/generate-image' && method === 'POST') {
+      response = await handleGenerateStoryImage(request, env, session);
     } else {
       // Try Angular SSR
       const angularResponse = await angularApp.handle(request, { env, ctx });

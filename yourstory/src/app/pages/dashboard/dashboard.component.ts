@@ -1,7 +1,7 @@
 import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
+import { catchError, finalize, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ActivitySummary, MilestoneEvent, MilestoneType, TimelineData } from '../../core/models/activity.models';
 import { GitHubService } from '../../core/services/github.service';
@@ -159,6 +159,20 @@ import { SharePlatform } from '../../core/constants/share.constants';
                     </span>
                     <span class="text-gray-500 dark:text-gray-500 text-xs">~3 min read</span>
                   </div>
+
+                  @if (isImageGenerationEnabled()) {
+                    @if (isGeneratingImage()) {
+                      <div class="mb-4 h-52 w-full animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"></div>
+                    } @else if (storyImageUrl(); as imageUrl) {
+                      <img
+                        [src]="imageUrl"
+                        [alt]="storyResult.title + ' thematic artwork'"
+                        class="mb-4 w-full h-auto object-contain rounded-xl border border-gray-200 dark:border-gray-700"
+                        loading="lazy"
+                      />
+                    }
+                  }
+
                   <h4 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">{{ storyResult.title }}</h4>
                   <p class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line">{{ storyResult.story }}</p>
                   <p class="text-gray-500 dark:text-gray-500 text-xs mt-4">Produced by CodeRabbit</p>
@@ -527,6 +541,8 @@ export class DashboardComponent {
   readonly selectedGenre = signal<string>(GENRES[0] as string);
   readonly selectedLanguage = signal<string>(LANGUAGES[0] as string);
   readonly isGenerating = signal(false);
+  readonly isImageGenerationEnabled = signal(true);
+  readonly isGeneratingImage = signal(false);
   readonly isDownloading = signal(false);
   readonly isLoadingTimeline = signal(false);
   readonly isDownloadingTimeline = signal(false);
@@ -535,6 +551,7 @@ export class DashboardComponent {
   readonly timelineData = signal<TimelineData | null>(null);
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
   readonly generatedStory = signal<StoryResponse | null>(null);
+  readonly storyImageUrl = signal<string | null>(null);
   readonly memberSinceYear = signal<number | null>(null);
   readonly shareNotification = signal<string | null>(null);
 
@@ -658,6 +675,9 @@ export class DashboardComponent {
 
   onGenerateStory(): void {
     this.isGenerating.set(true);
+    this.isImageGenerationEnabled.set(true);
+    this.storyImageUrl.set(null);
+    this.isGeneratingImage.set(false);
 
     const createdAt = this.authService.user()?.created_at;
 
@@ -671,13 +691,58 @@ export class DashboardComponent {
           createdAt,
           activity.topRepositories
         );
+      }),
+      switchMap((storyResult) => {
+        this.generatedStory.set(storyResult);
+        this.isImageGenerationEnabled.set(storyResult.imageGenerationEnabled !== false);
+
+        if (storyResult.imageGenerationEnabled === false) {
+          this.storyImageUrl.set(null);
+          this.isGeneratingImage.set(false);
+          return of(null);
+        }
+
+        const username = this.authService.user()?.login;
+        const activity = this.aggregatedActivity();
+
+        if (!username || !activity) {
+          return of(null);
+        }
+
+        this.isGeneratingImage.set(true);
+        return this.storyService.generateStoryImage(
+          this.selectedGenre(),
+          storyResult.title,
+          username,
+          {
+            commits: activity.commits,
+            issues: activity.issues,
+            pullRequests: activity.pullRequests,
+            reviews: activity.reviews,
+            lifetimeDiscussions: activity.lifetimeDiscussions,
+            lifetimeDiscussionComments: activity.lifetimeDiscussionComments,
+            privateContributions: activity.privateContributions,
+          }
+        ).pipe(
+          catchError((error) => {
+            console.error('Story image generation failed:', error);
+            this.storyImageUrl.set(null);
+            return of(null);
+          }),
+          finalize(() => {
+            this.isGeneratingImage.set(false);
+          })
+        );
       })
     ).subscribe({
-      next: (result) => {
-        this.generatedStory.set(result);
+      next: (imageResult) => {
+        if (imageResult?.imageUrl) {
+          this.storyImageUrl.set(imageResult.imageUrl);
+        }
         this.isGenerating.set(false);
       },
       error: () => {
+        this.isGeneratingImage.set(false);
         this.isGenerating.set(false);
       },
     });
