@@ -17,6 +17,18 @@ export interface StoryResponse {
   story: string;
   genre: string;
   year?: number;
+  imageGenerationEnabled?: boolean;
+}
+
+export interface ImageGenerationRequest {
+  genre: string;
+  storyTitle: string;
+  username: string;
+  stats: Record<string, number>;
+}
+
+export interface ImageGenerationResponse {
+  imageUrl: string;
 }
 
 export const GENRES = [
@@ -48,5 +60,18 @@ export class StoryService {
   ): Observable<StoryResponse> {
     const body: StoryRequest = { genre, language, activity, createdAt, topRepositories };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
+  }
+
+  /**
+   * Requests a thematic AI image for the generated story card.
+   */
+  generateStoryImage(
+    genre: string,
+    storyTitle: string,
+    username: string,
+    stats: Record<string, number>
+  ): Observable<ImageGenerationResponse> {
+    const body: ImageGenerationRequest = { genre, storyTitle, username, stats };
+    return this.http.post<ImageGenerationResponse>('/api/stories/generate-image', body);
   }
 }

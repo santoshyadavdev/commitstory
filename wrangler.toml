@@ -3,6 +3,11 @@ main = "dist/yourstory/server/server.mjs"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+# Feature flag for story image generation endpoint.
+# Set to "false" to disable /api/stories/generate-image.
+ENABLE_STORY_IMAGE_GENERATION = "true"
+
 [assets]
 directory = "dist/yourstory/browser"
 binding = "ASSETS"

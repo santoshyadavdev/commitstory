@@ -44,7 +44,12 @@ The Angular SSR bundle is shared between both runtimes; only the HTTP-adapter la
    wrangler secret put GITHUB_CLIENT_SECRET
    wrangler secret put GITHUB_CALLBACK_URL
    ```
-3. Update your **GitHub OAuth App** callback URL to point at your Cloudflare Workers domain, e.g.:
+3. (Optional) Disable story image generation by setting the worker variable:
+   ```toml
+   [vars]
+   ENABLE_STORY_IMAGE_GENERATION = "false"
+   ```
+4. Update your **GitHub OAuth App** callback URL to point at your Cloudflare Workers domain, e.g.:
    ```
    https://your-worker.your-subdomain.workers.dev/api/auth/github/callback
    ```
@@ -63,6 +68,12 @@ All secrets are stored as Cloudflare Workers secrets (encrypted at rest) and nev
 | `GITHUB_CLIENT_ID` | Identifies your GitHub OAuth App. | Create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers). |
 | `GITHUB_CLIENT_SECRET` | Authenticates your GitHub OAuth App. | Found on the same GitHub OAuth App settings page as `GITHUB_CLIENT_ID`. |
 | `GITHUB_CALLBACK_URL` | The URL GitHub redirects to after OAuth. Must match exactly what is registered in the GitHub OAuth App. | Set to your production Workers URL path `/api/auth/github/callback`. For local dev use `http://localhost:8787/api/auth/github/callback`. |
+
+### Optional feature flag
+
+| Variable | Purpose | Values |
+|---|---|---|
+| `ENABLE_STORY_IMAGE_GENERATION` | Enables/disables `POST /api/stories/generate-image`. | `true` (default), `false`, `0`, `off`, `no` |
 
 > **Note:** The GitHub OAuth App requires a **separate callback URL** for each environment (local and production). You can register both under the same OAuth App by using the "Authorization callback URL" field — GitHub only supports one URL per app, so you may need to create separate OAuth Apps for local and production environments, or update the value between deployments.
 
