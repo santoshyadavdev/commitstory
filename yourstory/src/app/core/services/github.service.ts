@@ -1,7 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { catchError, forkJoin, map, Observable, of } from 'rxjs';
-import { ActivitySummary, RepositoryContribution, TimelineData, YearlyActivity } from '../models/activity.models';
+import {
+  ActivitySummary,
+  RepositoryContribution,
+  RepositoryInsight,
+  RepositoryInsightsResponse,
+  TimelineData,
+  YearlyActivity,
+  YearlyRepoContribution,
+} from '../models/activity.models';
 
 interface ContributionsResponse {
   year: number;
@@ -153,6 +161,72 @@ export class GitHubService {
           lifetimeDiscussionComments: discussions.lifetimeDiscussionComments,
           topRepositories,
         };
+      })
+    );
+  }
+
+  /**
+   * Fetches repository contribution insights from account creation year to current year,
+   * capped at a maximum of 10 years, and merges per-repository activity across years.
+   */
+  getRepositoryInsights(createdAt?: string): Observable<RepositoryInsightsResponse> {
+    const currentYear = new Date().getFullYear();
+    const MAX_YEARS = 10;
+    const TOP_REPOSITORIES_LIMIT = 10;
+
+    let startYear: number;
+    if (createdAt) {
+      const creationYear = new Date(createdAt).getFullYear();
+      startYear = Math.max(creationYear, currentYear - MAX_YEARS + 1);
+    } else {
+      startYear = currentYear - 3;
+    }
+
+    const years: number[] = [];
+    for (let y = startYear; y <= currentYear; y++) {
+      years.push(y);
+    }
+
+    return forkJoin(years.map((year) => this.getRepositoryContributions(year))).pipe(
+      map((yearlyResults) => {
+        const repoMap = new Map<string, RepositoryInsight>();
+
+        for (const yearData of yearlyResults) {
+          const year = yearData.year;
+          for (const repo of yearData.topRepositories) {
+            const yearlyContribution: YearlyRepoContribution = {
+              year,
+              commits: repo.commits,
+              pullRequests: repo.pullRequests,
+              totalContributions: repo.totalContributions,
+            };
+
+            const existing = repoMap.get(repo.nameWithOwner);
+            if (existing) {
+              existing.totalContributions += repo.totalContributions;
+              existing.yearlyBreakdown.push(yearlyContribution);
+            } else {
+              repoMap.set(repo.nameWithOwner, {
+                name: repo.name,
+                nameWithOwner: repo.nameWithOwner,
+                url: repo.url,
+                stargazerCount: repo.stargazerCount,
+                totalContributions: repo.totalContributions,
+                yearlyBreakdown: [yearlyContribution],
+              });
+            }
+          }
+        }
+
+        const repositories = Array.from(repoMap.values())
+          .map((repo) => ({
+            ...repo,
+            yearlyBreakdown: repo.yearlyBreakdown.sort((a, b) => b.year - a.year),
+          }))
+          .sort((a, b) => b.totalContributions - a.totalContributions)
+          .slice(0, TOP_REPOSITORIES_LIMIT);
+
+        return { entries: repositories };
       })
     );
   }

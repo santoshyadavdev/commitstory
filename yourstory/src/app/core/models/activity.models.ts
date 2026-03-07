@@ -18,6 +18,26 @@ export interface RepositoryContribution {
   totalContributions: number;
 }
 
+export interface YearlyRepoContribution {
+  year: number;
+  commits: number;
+  pullRequests: number;
+  totalContributions: number;
+}
+
+export interface RepositoryInsight {
+  name: string;
+  nameWithOwner: string;
+  url: string;
+  stargazerCount: number;
+  totalContributions: number;
+  yearlyBreakdown: YearlyRepoContribution[];
+}
+
+export interface RepositoryInsightsResponse {
+  entries: RepositoryInsight[];
+}
+
 export interface ActivitySummary {
   commits: number;
   issues: number;
