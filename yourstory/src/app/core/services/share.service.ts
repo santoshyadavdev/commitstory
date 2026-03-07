@@ -72,9 +72,15 @@ export class ShareService {
   // ---------------------------------------------------------------------------
 
   private getGenericText(type: ShareType, genre?: string): string {
-    return type === 'story'
-      ? `Check out my GitHub developer story${genre ? ` (${genre})` : ''}! 🚀`
-      : `Check out my GitHub developer timeline! 🗓️`;
+    if (type === 'story') {
+      return `Check out my GitHub developer story${genre ? ` (${genre})` : ''}! 🚀`;
+    }
+
+    if (type === 'insights') {
+      return 'Check out my GitHub repository insights! 📊';
+    }
+
+    return 'Check out my GitHub developer timeline! 🗓️';
   }
 
   private buildTwitterUrl(type: ShareType, genre: string | undefined, username: string): string {
@@ -98,7 +104,9 @@ export class ShareService {
   private buildWhatsAppUrl(type: ShareType, genre: string | undefined, username: string): string {
     const contentLine = type === 'story'
       ? `I just generated my GitHub developer story${genre ? ` (${genre} genre)` : ''} with CommitStory! 🚀`
-      : `I just generated my GitHub developer timeline with CommitStory! 🗓️`;
+      : type === 'insights'
+        ? 'I just generated my GitHub repository insights with CommitStory! 📊'
+        : 'I just generated my GitHub developer timeline with CommitStory! 🗓️';
 
     const profileLine = username ? `\nMy GitHub profile: https://github.com/${username}` : '';
 

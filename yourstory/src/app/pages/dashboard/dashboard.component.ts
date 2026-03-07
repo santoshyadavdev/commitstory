@@ -3,7 +3,13 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, finalize, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { ActivitySummary, MilestoneEvent, MilestoneType, TimelineData } from '../../core/models/activity.models';
+import {
+  ActivitySummary,
+  MilestoneEvent,
+  MilestoneType,
+  RepositoryInsight,
+  TimelineData,
+} from '../../core/models/activity.models';
 import { GitHubService } from '../../core/services/github.service';
 import { ShareService, ShareResult } from '../../core/services/share.service';
 import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
@@ -56,6 +62,16 @@ import { SharePlatform } from '../../core/constants/share.constants';
             (click)="setViewMode('story')"
           >
             Generate Story
+          </button>
+          <button
+            class="px-4 py-2 text-sm rounded-md transition-colors"
+            [class.bg-coderabbit-orange]="viewMode() === 'insights'"
+            [class.text-white]="viewMode() === 'insights'"
+            [class.text-gray-600]="viewMode() !== 'insights'"
+            [class.dark:text-gray-300]="viewMode() !== 'insights'"
+            (click)="onViewInsights()"
+          >
+            Insights
           </button>
         </div>
 
@@ -500,6 +516,131 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           }
         }
+
+        @if (viewMode() === 'insights') {
+          @if (insightsError()) {
+            <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
+              {{ insightsError() }}
+            </div>
+          }
+
+          <div #insightsShareCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-md">
+                  <span class="text-white text-lg">📊</span>
+                </div>
+                <div>
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white">Repository Insights</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Top repositories by contribution impact</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <app-share-dropdown [onShare]="insightsShareHandler"></app-share-dropdown>
+                <button
+                  class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
+                  [disabled]="isDownloadingInsights()"
+                  (click)="downloadInsightsAsImage()"
+                >
+                  @if (isDownloadingInsights()) {
+                    <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    <span>Saving…</span>
+                  } @else {
+                    <span>⬇ Download Insights as Image</span>
+                  }
+                </button>
+              </div>
+            </div>
+
+            @if (isLoadingInsights()) {
+              <div class="flex flex-col items-center gap-4 py-16">
+                <div class="relative">
+                  <div class="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-700 border-t-coderabbit-orange"></div>
+                </div>
+                <span class="text-sm text-gray-500 dark:text-gray-400">Loading repository insights…</span>
+              </div>
+            } @else if (insightsData(); as insights) {
+              <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                  <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600"></div>
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ insights.length | number }}</p>
+                  <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Repositories</p>
+                </div>
+                <div class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
+                  <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ totalInsightContributions() | number }}</p>
+                  <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Total Contributions</p>
+                </div>
+              </div>
+
+              @if (insights.length > 0) {
+                <div class="space-y-3">
+                  @for (repo of insights; track repo.nameWithOwner) {
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/30 p-4">
+                      <button
+                        class="w-full flex items-center justify-between gap-4 text-left"
+                        (click)="toggleRepoExpand(repo.nameWithOwner)"
+                        [attr.aria-expanded]="expandedRepo() === repo.nameWithOwner"
+                      >
+                        <div class="min-w-0 flex-1">
+                          <a
+                            [href]="repo.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-sm md:text-base font-semibold text-gray-900 dark:text-white hover:text-coderabbit-orange transition-colors truncate block"
+                            (click)="$event.stopPropagation()"
+                          >
+                            {{ repo.nameWithOwner }}
+                          </a>
+                          <div class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-amber-700 dark:text-amber-300 font-medium">
+                              ⭐ {{ repo.stargazerCount | number }}
+                            </span>
+                            <span>{{ repo.totalContributions | number }} contributions</span>
+                          </div>
+                        </div>
+                        <span
+                          class="text-gray-400 dark:text-gray-500 transition-transform"
+                          [class.rotate-180]="expandedRepo() === repo.nameWithOwner"
+                        >⌄</span>
+                      </button>
+
+                      @if (expandedRepo() === repo.nameWithOwner) {
+                        <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                          @for (year of repo.yearlyBreakdown; track year.year) {
+                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/50 px-3 py-2">
+                              <div class="flex items-center justify-between gap-3">
+                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ year.year }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ year.totalContributions | number }} total</p>
+                              </div>
+                              <div class="mt-1 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                <p>Commits: <span class="font-semibold">{{ year.commits | number }}</span></p>
+                                <p>Pull Requests: <span class="font-semibold">{{ year.pullRequests | number }}</span></p>
+                              </div>
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="py-12 text-center text-gray-500 dark:text-gray-400">
+                  No repository insights available yet.
+                </div>
+              }
+            } @else {
+              <div class="py-12 text-center text-gray-400 dark:text-gray-500">
+                <p class="text-lg mb-1">📊</p>
+                <p class="text-sm">Loading repository insights…</p>
+              </div>
+            }
+
+            <div class="mt-6 text-right">
+              <span class="text-xs text-gray-400 dark:text-gray-600 font-mono">commitstory</span>
+            </div>
+          </div>
+        }
       </div>
     </div>
   `,
@@ -507,6 +648,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
 export class DashboardComponent {
   @ViewChild('shareCard') private readonly shareCard!: ElementRef<HTMLElement>;
   @ViewChild('timelineCard') private readonly timelineCard!: ElementRef<HTMLElement>;
+  @ViewChild('insightsShareCard') private readonly insightsShareCard!: ElementRef<HTMLElement>;
 
   private readonly githubService = inject(GitHubService);
   protected readonly authService = inject(AuthService);
@@ -533,11 +675,21 @@ export class DashboardComponent {
     this.showShareToast(result);
   };
 
+  readonly insightsShareHandler = async (platform: SharePlatform): Promise<void> => {
+    if (!this.insightsShareCard) return;
+    const bg = this.themeService.isDark() ? '#171717' : '#F6F6F1';
+    const result = await this.shareService.shareWithImage(
+      this.insightsShareCard.nativeElement, platform, 'insights', undefined, bg,
+    );
+    this.showShareToast(result);
+  };
+
   readonly genres = GENRES;
   readonly languages = LANGUAGES;
 
-  readonly viewMode = signal<'story' | 'timeline'>('timeline');
+  readonly viewMode = signal<'story' | 'timeline' | 'insights'>('timeline');
   readonly expandedMilestone = signal<number | null>(null);
+  readonly expandedRepo = signal<string | null>(null);
   readonly selectedGenre = signal<string>(GENRES[0] as string);
   readonly selectedLanguage = signal<string>(LANGUAGES[0] as string);
   readonly isGenerating = signal(false);
@@ -546,14 +698,22 @@ export class DashboardComponent {
   readonly isDownloading = signal(false);
   readonly isLoadingTimeline = signal(false);
   readonly isDownloadingTimeline = signal(false);
+  readonly isLoadingInsights = signal(false);
+  readonly isDownloadingInsights = signal(false);
   readonly timelineError = signal<string | null>(null);
+  readonly insightsError = signal<string | null>(null);
   readonly timelineMessage = signal<string | null>(null);
   readonly timelineData = signal<TimelineData | null>(null);
+  readonly insightsData = signal<RepositoryInsight[] | null>(null);
   readonly aggregatedActivity = signal<ActivitySummary | null>(null);
   readonly generatedStory = signal<StoryResponse | null>(null);
   readonly storyImageUrl = signal<string | null>(null);
   readonly memberSinceYear = signal<number | null>(null);
   readonly shareNotification = signal<string | null>(null);
+
+  readonly totalInsightContributions = computed(() =>
+    (this.insightsData() ?? []).reduce((sum, repo) => sum + repo.totalContributions, 0)
+  );
 
   // Timeline filters
   readonly filterAccountCreated = signal(true);
@@ -619,7 +779,7 @@ export class DashboardComponent {
     setTimeout(() => this.shareNotification.set(null), 5000);
   }
 
-  setViewMode(mode: 'story' | 'timeline'): void {
+  setViewMode(mode: 'story' | 'timeline' | 'insights'): void {
     this.viewMode.set(mode);
   }
 
@@ -653,6 +813,33 @@ export class DashboardComponent {
         this.isLoadingTimeline.set(false);
       },
     });
+  }
+
+  onViewInsights(): void {
+    this.viewMode.set('insights');
+    this.insightsError.set(null);
+
+    if (this.insightsData()) {
+      return;
+    }
+
+    this.isLoadingInsights.set(true);
+    const createdAt = this.authService.user()?.created_at;
+
+    this.githubService.getRepositoryInsights(createdAt).subscribe({
+      next: (result) => {
+        this.insightsData.set(result.entries);
+        this.isLoadingInsights.set(false);
+      },
+      error: () => {
+        this.insightsError.set('Could not load repository insights right now. Please try again.');
+        this.isLoadingInsights.set(false);
+      },
+    });
+  }
+
+  toggleRepoExpand(nameWithOwner: string): void {
+    this.expandedRepo.set(this.expandedRepo() === nameWithOwner ? null : nameWithOwner);
   }
 
   selectAllFilters(): void {
@@ -913,6 +1100,28 @@ export class DashboardComponent {
       console.error('Timeline download failed:', err);
     } finally {
       this.isDownloadingTimeline.set(false);
+    }
+  }
+
+  async downloadInsightsAsImage(): Promise<void> {
+    if (!this.insightsShareCard) return;
+    this.isDownloadingInsights.set(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const backgroundColor = this.themeService.isDark() ? '#171717' : '#F6F6F1';
+      const dataUrl = await toPng(this.insightsShareCard.nativeElement, {
+        backgroundColor,
+        pixelRatio: 2,
+      });
+      const link = document.createElement('a');
+      const username = this.authService.user()?.login || 'developer';
+      link.download = `github-insights-${username}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Insights download failed:', err);
+    } finally {
+      this.isDownloadingInsights.set(false);
     }
   }
 }

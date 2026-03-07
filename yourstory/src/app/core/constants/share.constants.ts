@@ -11,4 +11,4 @@ export const SHARE_BASE_URLS = {
 } as const;
 
 export type SharePlatform = keyof typeof SHARE_BASE_URLS;
-export type ShareType = 'story' | 'timeline';
+export type ShareType = 'story' | 'timeline' | 'insights';
