@@ -11,7 +11,6 @@ import {
   withEventReplay,
 } from '@angular/platform-browser';
 import { provideHttpClient, withFetch } from '@angular/common/http';
-import { AuthService } from './core/auth/auth.service';
 import { ThemeService } from './core/services/theme.service';
 
 export const appConfig: ApplicationConfig = {
@@ -25,14 +24,6 @@ export const appConfig: ApplicationConfig = {
       useFactory: () => {
         const themeService = inject(ThemeService);
         return () => themeService.init();
-      },
-      multi: true,
-    },
-    {
-      provide: APP_INITIALIZER,
-      useFactory: () => {
-        const authService = inject(AuthService);
-        return () => authService.checkSession();
       },
       multi: true,
     },

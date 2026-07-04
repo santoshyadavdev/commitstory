@@ -22,6 +22,8 @@ interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   GITHUB_CALLBACK_URL: string;
+  /** Personal Access Token used for server-side GitHub API requests */
+  GITHUB_TOKEN?: string;
   /** Bound asset fetcher for static files from dist/yourstory/browser */
   ASSETS: Fetcher;
 }
@@ -339,33 +341,64 @@ function handleAuthUser(session: SessionData): Response {
 }
 
 /**
- * GET /api/github/contributions?year=2024
+ * GET /api/github/user?username=...
  */
-async function handleContributions(request: Request, session: SessionData): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
+async function handleGetUser(request: Request, env: Env): Promise<Response> {
+  const username = new URL(request.url).searchParams.get('username') ?? '';
+  if (!username) return json({ error: 'username is required' }, 400);
 
-  const login = session.user.login;
-  const year = parseInt(new URL(request.url).searchParams.get('year') ?? '') || new Date().getFullYear();
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  try {
+    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'commitstory-app',
+      },
+    });
+
+    if (response.status === 404) return json({ error: 'User not found' }, 404);
+    if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
+
+    const user = (await response.json()) as {
+      login: string;
+      name: string | null;
+      avatar_url: string;
+      html_url: string;
+      created_at: string;
+    };
+
+    return json({
+      login: user.login,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      html_url: user.html_url,
+      created_at: user.created_at,
+    });
+  } catch (err) {
+    console.error('GitHub user fetch error:', err);
+    return json({ error: 'Failed to fetch user' }, 500);
+  }
+}
+
+/**
+ * GET /api/github/contributions?username=...&year=2024
+ */
+async function handleContributions(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const login = url.searchParams.get('username') ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
+
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  const year = parseInt(url.searchParams.get('year') ?? '') || new Date().getFullYear();
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
-  const queryWithPrivateContributions = `
-    query($login: String!, $from: DateTime!, $to: DateTime!) {
-      user(login: $login) {
-        contributionsCollection(from: $from, to: $to) {
-          totalCommitContributions
-          totalIssueContributions
-          totalPullRequestContributions
-          totalPullRequestReviewContributions
-          restrictedContributionsCount
-        }
-      }
-    }
-  `;
-
-  const queryWithoutPrivateContributions = `
+  const query = `
     query($login: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $login) {
         contributionsCollection(from: $from, to: $to) {
@@ -379,18 +412,15 @@ async function handleContributions(request: Request, session: SessionData): Prom
   `;
 
   try {
-    const requestGraphQL = (query: string) =>
-      fetch('https://api.github.com/graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'commitstory-app',
-        },
-        body: JSON.stringify({ query, variables: { login, from, to } }),
-      });
-
-    const response = await requestGraphQL(queryWithPrivateContributions);
+    const response = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'commitstory-app',
+      },
+      body: JSON.stringify({ query, variables: { login, from, to } }),
+    });
 
     if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
 
@@ -399,80 +429,16 @@ async function handleContributions(request: Request, session: SessionData): Prom
       totalIssueContributions: number;
       totalPullRequestContributions: number;
       totalPullRequestReviewContributions: number;
-      restrictedContributionsCount?: number;
     };
 
     const data = (await response.json()) as {
-      data?: {
-        user?: {
-          contributionsCollection?: ContributionsCollection;
-        };
-      };
-      errors?: Array<{
-        message: string;
-        type?: string;
-        extensions?: {
-          saml_failure?: boolean;
-          type?: string;
-        };
-      }>;
+      data?: { user?: { contributionsCollection?: ContributionsCollection } };
+      errors?: Array<{ message: string }>;
     };
 
-    let privateContributionsBlocked = false;
-    let c = data.data?.user?.contributionsCollection;
-    if (data.errors?.length) {
-      const hasSamlError = data.errors.some((error) => {
-        const message = error.message?.toLowerCase() ?? '';
-        return (
-          error.extensions?.saml_failure === true ||
-          message.includes('saml enforcement') ||
-          message.includes('organization saml')
-        );
-      });
+    if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
 
-      if (!hasSamlError) {
-        return json({ error: data.errors[0].message }, 400);
-      }
-
-      privateContributionsBlocked = true;
-
-      // Retry without restrictedContributionsCount so we can still return public totals.
-      const fallbackResponse = await requestGraphQL(queryWithoutPrivateContributions);
-      if (!fallbackResponse.ok) {
-        let fallbackError = 'GitHub API error';
-        try {
-          const errorBody = (await fallbackResponse.json()) as { message?: string };
-          if (typeof errorBody.message === 'string' && errorBody.message.trim()) {
-            fallbackError = errorBody.message;
-          }
-        } catch {
-          // Ignore body parse issues and keep generic fallbackError.
-        }
-        return json({ error: fallbackError }, fallbackResponse.status);
-      }
-
-      const fallbackData = (await fallbackResponse.json()) as {
-        data?: {
-          user?: {
-            contributionsCollection?: ContributionsCollection;
-          };
-        };
-        errors?: Array<{
-          message: string;
-          type?: string;
-          extensions?: {
-            saml_failure?: boolean;
-            type?: string;
-          };
-        }>;
-      };
-
-      if (fallbackData.errors?.length) {
-        return json({ error: fallbackData.errors.map((error) => error.message).join('; ') }, 400);
-      }
-
-      c = fallbackData.data?.user?.contributionsCollection ?? c;
-    }
+    const c = data.data?.user?.contributionsCollection;
 
     return json({
       year,
@@ -480,8 +446,7 @@ async function handleContributions(request: Request, session: SessionData): Prom
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: privateContributionsBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
-      ...(privateContributionsBlocked ? { privateContributionsBlocked: true } : {}),
+      privateContributions: 0,
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
@@ -490,17 +455,20 @@ async function handleContributions(request: Request, session: SessionData): Prom
 }
 
 /**
- * GET /api/github/repository-contributions?year=2024
+ * GET /api/github/repository-contributions?username=...&year=2024
  */
 async function handleRepositoryContributions(
   request: Request,
-  session: SessionData,
+  env: Env,
 ): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
+  const url = new URL(request.url);
+  const login = url.searchParams.get('username') ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
 
-  const year = parseInt(new URL(request.url).searchParams.get('year') ?? '') || new Date().getFullYear();
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  const year = parseInt(url.searchParams.get('year') ?? '') || new Date().getFullYear();
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
@@ -525,11 +493,11 @@ async function handleRepositoryContributions(
     const response = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'commitstory-app',
       },
-      body: JSON.stringify({ query, variables: { login: session.user.login, from, to } }),
+      body: JSON.stringify({ query, variables: { login, from, to } }),
     });
 
     if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
@@ -606,14 +574,15 @@ async function handleRepositoryContributions(
 }
 
 /**
- * GET /api/github/discussions
+ * GET /api/github/discussions?username=...
  */
-async function handleDiscussions(request: Request, session: SessionData): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
+async function handleDiscussions(request: Request, env: Env): Promise<Response> {
+  const login = new URL(request.url).searchParams.get('username') ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
 
-  const login = session.user.login;
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
   const query = `
     query($login: String!) {
       user(login: $login) {
@@ -627,7 +596,7 @@ async function handleDiscussions(request: Request, session: SessionData): Promis
     const response = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'commitstory-app',
       },
@@ -662,15 +631,16 @@ async function handleDiscussions(request: Request, session: SessionData): Promis
 /**
  * POST /api/github/milestones
  */
-async function handleMilestones(request: Request, session: SessionData): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
+async function handleMilestones(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as { username?: string; accountCreatedAt?: string | null };
+  const login = body.username ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
 
-  void request;
-  const login = session.user.login;
-  const accessToken = session.accessToken;
-  const accountCreatedAt = session.user.created_at ?? null;
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  const accessToken = token;
+  const accountCreatedAt = body.accountCreatedAt ?? null;
 
   type GraphQLError = { message: string };
   type MilestoneEvent = {
@@ -955,17 +925,13 @@ async function handleMilestones(request: Request, session: SessionData): Promise
 async function handleGenerateStory(
   request: Request,
   env: Env,
-  session: SessionData,
 ): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
-
-  const { genre, language, activity, createdAt, topRepositories } = (await request.json()) as {
+  const { genre, language, activity, createdAt, topRepositories, username } = (await request.json()) as {
     genre?: unknown;
     language?: unknown;
     activity?: unknown;
     createdAt?: string;
+    username?: string;
     topRepositories?: Array<{
       name: string;
       nameWithOwner: string;
@@ -979,6 +945,9 @@ async function handleGenerateStory(
 
   if (typeof genre !== 'string' || !genre.trim()) {
     return json({ error: 'genre must be a non-empty string' }, 400);
+  }
+  if (typeof username !== 'string' || !username.trim()) {
+    return json({ error: 'username must be a non-empty string' }, 400);
   }
   const selectedLanguage = typeof language === 'string' && language.trim() ? language : 'English';
   const allowedLanguages = ['English', 'Hindi', 'Mandarin Chinese', 'Japanese', 'Spanish', 'French', 'German'];
@@ -994,9 +963,8 @@ async function handleGenerateStory(
 
   try {
     const genAI = new GoogleGenAI({ apiKey });
-    const username = session.user.login;
 
-    const memberSince = createdAt ?? session.user.created_at;
+    const memberSince = createdAt;
     let accountAgeText = '';
     if (memberSince) {
       const creationYear = new Date(memberSince).getFullYear();
@@ -1069,11 +1037,11 @@ async function handleGenerateStory(
     ].join('\n');
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-2.5-flash',
       contents: userPrompt,
       config: {
         systemInstruction,
-        maxOutputTokens: 700,
+        maxOutputTokens: 1500,
         temperature: 0.7,
       },
     });
@@ -1116,12 +1084,7 @@ async function handleGenerateStory(
 async function handleGenerateStoryImage(
   request: Request,
   env: Env,
-  session: SessionData,
 ): Promise<Response> {
-  if (!session.accessToken || !session.user) {
-    return json({ error: 'Not authenticated' }, 401);
-  }
-
   const { genre, storyTitle, username, stats } = (await request.json()) as {
     genre?: unknown;
     storyTitle?: unknown;
@@ -1178,13 +1141,10 @@ async function handleGenerateStoryImage(
     ].filter(Boolean).join(' ');
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-2.5-flash-image',
       contents: prompt,
       config: {
         responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: '16:9',
-        },
       },
     });
 
@@ -1237,18 +1197,20 @@ export default {
       clearSession = true;
     } else if (path === '/api/auth/user' && method === 'GET') {
       response = handleAuthUser(session);
+    } else if (path === '/api/github/user' && method === 'GET') {
+      response = await handleGetUser(request, env);
     } else if (path === '/api/github/contributions' && method === 'GET') {
-      response = await handleContributions(request, session);
+      response = await handleContributions(request, env);
     } else if (path === '/api/github/repository-contributions' && method === 'GET') {
-      response = await handleRepositoryContributions(request, session);
+      response = await handleRepositoryContributions(request, env);
     } else if (path === '/api/github/discussions' && method === 'GET') {
-      response = await handleDiscussions(request, session);
+      response = await handleDiscussions(request, env);
     } else if (path === '/api/github/milestones' && method === 'POST') {
-      response = await handleMilestones(request, session);
+      response = await handleMilestones(request, env);
     } else if (path === '/api/stories/generate' && method === 'POST') {
-      response = await handleGenerateStory(request, env, session);
+      response = await handleGenerateStory(request, env);
     } else if (path === '/api/stories/generate-image' && method === 'POST') {
-      response = await handleGenerateStoryImage(request, env, session);
+      response = await handleGenerateStoryImage(request, env);
     } else {
       // Try Angular SSR
       const angularResponse = await angularApp.handle(request, { env, ctx });
