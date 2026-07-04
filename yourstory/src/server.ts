@@ -398,7 +398,21 @@ async function handleContributions(request: Request, env: Env): Promise<Response
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
-  const query = `
+  const queryWithPrivate = `
+    query($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
+          totalCommitContributions
+          totalIssueContributions
+          totalPullRequestContributions
+          totalPullRequestReviewContributions
+          restrictedContributionsCount
+        }
+      }
+    }
+  `;
+
+  const queryWithoutPrivate = `
     query($login: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $login) {
         contributionsCollection(from: $from, to: $to) {
@@ -411,8 +425,8 @@ async function handleContributions(request: Request, env: Env): Promise<Response
     }
   `;
 
-  try {
-    const response = await fetch('https://api.github.com/graphql', {
+  const requestGraphQL = (query: string) =>
+    fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -422,23 +436,44 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       body: JSON.stringify({ query, variables: { login, from, to } }),
     });
 
-    if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
-
+  try {
     type ContributionsCollection = {
       totalCommitContributions: number;
       totalIssueContributions: number;
       totalPullRequestContributions: number;
       totalPullRequestReviewContributions: number;
+      restrictedContributionsCount?: number;
     };
 
-    const data = (await response.json()) as {
+    type GraphQLResponse = {
       data?: { user?: { contributionsCollection?: ContributionsCollection } };
-      errors?: Array<{ message: string }>;
+      errors?: Array<{ message: string; extensions?: { saml_failure?: boolean } }>;
     };
 
-    if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
+    const response = await requestGraphQL(queryWithPrivate);
+    if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
 
-    const c = data.data?.user?.contributionsCollection;
+    const data = (await response.json()) as GraphQLResponse;
+
+    let c = data.data?.user?.contributionsCollection;
+    let privateBlocked = false;
+
+    if (data.errors?.length) {
+      const hasSamlError = data.errors.some((e) => {
+        const msg = e.message?.toLowerCase() ?? '';
+        return e.extensions?.saml_failure === true || msg.includes('saml') || msg.includes('organization');
+      });
+
+      if (!hasSamlError) return json({ error: data.errors[0].message }, 400);
+
+      // Retry without restrictedContributionsCount for SAML-enforced orgs
+      privateBlocked = true;
+      const fallback = await requestGraphQL(queryWithoutPrivate);
+      if (!fallback.ok) return json({ error: 'GitHub API error' }, fallback.status);
+      const fallbackData = (await fallback.json()) as GraphQLResponse;
+      if (fallbackData.errors?.length) return json({ error: fallbackData.errors[0].message }, 400);
+      c = fallbackData.data?.user?.contributionsCollection ?? c;
+    }
 
     return json({
       year,
@@ -446,7 +481,8 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: 0,
+      privateContributions: privateBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
+      ...(privateBlocked ? { privateContributionsBlocked: true } : {}),
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
