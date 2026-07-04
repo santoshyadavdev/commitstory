@@ -9,6 +9,7 @@ export interface StoryRequest {
   activity: ActivitySummary;
   year?: number;
   createdAt?: string;
+  username: string;
   topRepositories?: RepositoryContribution[];
 }
 
@@ -55,10 +56,11 @@ export class StoryService {
     genre: string,
     language: string,
     activity: ActivitySummary,
+    username: string,
     createdAt?: string,
     topRepositories?: RepositoryContribution[]
   ): Observable<StoryResponse> {
-    const body: StoryRequest = { genre, language, activity, createdAt, topRepositories };
+    const body: StoryRequest = { genre, language, activity, username, createdAt, topRepositories };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
   }
 

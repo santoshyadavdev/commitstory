@@ -1,8 +1,7 @@
-import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, finalize, of, switchMap } from 'rxjs';
-import { AuthService } from '../../core/auth/auth.service';
 import {
   ActivitySummary,
   MilestoneEvent,
@@ -10,7 +9,7 @@ import {
   RepositoryInsight,
   TimelineData,
 } from '../../core/models/activity.models';
-import { GitHubService } from '../../core/services/github.service';
+import { GitHubService, GitHubUserProfile } from '../../core/services/github.service';
 import { ShareService, ShareResult } from '../../core/services/share.service';
 import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -37,9 +36,63 @@ import { SharePlatform } from '../../core/constants/share.constants';
       }
 
       <div class="max-w-5xl mx-auto">
-        <h2 class="text-3xl font-bold mb-4">Your GitHub Story</h2>
+
+        <!-- Username search -->
+        <div class="mb-8">
+          <form (ngSubmit)="onSearchUser()" class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <div class="flex flex-1 gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                id="github-username"
+                class="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Enter GitHub username…"
+                [ngModel]="usernameInput()"
+                (ngModelChange)="usernameInput.set($event)"
+                name="username"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+              <button
+                type="submit"
+                class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap"
+                [disabled]="isSearching() || !usernameInput().trim()"
+              >
+                @if (isSearching()) {
+                  <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  <span>Loading…</span>
+                } @else {
+                  <span>🔍 View Story</span>
+                }
+              </button>
+            </div>
+          </form>
+          @if (searchError()) {
+            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ searchError() }}</p>
+          }
+          @if (userProfile(); as profile) {
+            <div class="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600" />
+              <span class="font-medium text-gray-900 dark:text-white">{{ profile.name || profile.login }}</span>
+              <span class="text-gray-400">·</span>
+              <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-coderabbit-orange hover:underline">@{{ profile.login }}</a>
+            </div>
+          }
+        </div>
+
+        @if (!currentUsername()) {
+          <!-- Landing prompt -->
+          <div class="flex flex-col items-center justify-center py-24 text-center">
+            <div class="text-6xl mb-6">🐇</div>
+            <h2 class="text-2xl font-bold mb-3 text-gray-900 dark:text-white">Explore Any GitHub Journey</h2>
+            <p class="text-gray-500 dark:text-gray-400 max-w-md">
+              Enter a GitHub username above to generate a career-spanning story, explore milestone timelines, and view repository insights — no login required.
+            </p>
+          </div>
+        } @else {
+        <h2 class="text-3xl font-bold mb-4">GitHub Story</h2>
         <p class="text-gray-600 dark:text-gray-400 mb-8">
-          Generate a career-spanning story or explore your milestone timeline based on your GitHub activity.
+          Generate a career-spanning story or explore the milestone timeline based on GitHub activity.
         </p>
 
         <div class="inline-flex bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-1 mb-8">
@@ -641,6 +694,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           </div>
         }
+        } <!-- end @else currentUsername -->
       </div>
     </div>
   `,
@@ -651,9 +705,8 @@ export class DashboardComponent {
   @ViewChild('insightsShareCard') private readonly insightsShareCard!: ElementRef<HTMLElement>;
 
   private readonly githubService = inject(GitHubService);
-  protected readonly authService = inject(AuthService);
   private readonly storyService = inject(StoryService);
-  private readonly themeService = inject(ThemeService);
+  protected readonly themeService = inject(ThemeService);
   private readonly shareService = inject(ShareService);
 
   // Bound callbacks passed as @Input to ShareDropdownComponent
@@ -686,6 +739,13 @@ export class DashboardComponent {
 
   readonly genres = GENRES;
   readonly languages = LANGUAGES;
+
+  // Username search state
+  readonly usernameInput = signal('');
+  readonly currentUsername = signal('');
+  readonly userProfile = signal<GitHubUserProfile | null>(null);
+  readonly isSearching = signal(false);
+  readonly searchError = signal<string | null>(null);
 
   readonly viewMode = signal<'story' | 'timeline' | 'insights'>('timeline');
   readonly expandedMilestone = signal<number | null>(null);
@@ -756,15 +816,37 @@ export class DashboardComponent {
   });
 
   constructor() {
-    effect(() => {
-      const createdAt = this.authService.user()?.created_at;
-      if (createdAt) {
-        this.memberSinceYear.set(new Date(createdAt).getFullYear());
-      }
-    });
+    // Nothing auto-loaded — user must enter a username first
+  }
 
-    // Auto-load timeline since it's the default view
-    this.onViewTimeline();
+  onSearchUser(): void {
+    const username = this.usernameInput().trim();
+    if (!username) return;
+
+    this.isSearching.set(true);
+    this.searchError.set(null);
+
+    this.githubService.getUser(username).subscribe({
+      next: (profile) => {
+        this.userProfile.set(profile);
+        this.currentUsername.set(profile.login);
+        this.isSearching.set(false);
+        // Reset all data when switching users
+        this.timelineData.set(null);
+        this.insightsData.set(null);
+        this.aggregatedActivity.set(null);
+        this.generatedStory.set(null);
+        this.storyImageUrl.set(null);
+        this.memberSinceYear.set(new Date(profile.created_at).getFullYear());
+        // Auto-load timeline for the new user
+        this.onViewTimeline();
+      },
+      error: (err) => {
+        const status = (err as { status?: number }).status;
+        this.searchError.set(status === 404 ? `User "${username}" not found on GitHub.` : 'Failed to load user. Please try again.');
+        this.isSearching.set(false);
+      },
+    });
   }
 
   toggleMilestone(index: number): void {
@@ -787,28 +869,32 @@ export class DashboardComponent {
     this.viewMode.set('timeline');
     this.timelineError.set(null);
 
+    const username = this.currentUsername();
+    if (!username) return;
+
     if (this.timelineData()) {
       return;
     }
 
     this.isLoadingTimeline.set(true);
-    this.githubService.getMilestones().subscribe({
+    const createdAt = this.userProfile()?.created_at ?? null;
+    this.githubService.getMilestones(username, createdAt).subscribe({
       next: (result) => {
         this.timelineData.set(result);
         this.timelineError.set(
           !result.username && result.events.length === 0
-            ? 'Could not load your timeline right now. Please try again.'
+            ? 'Could not load the timeline right now. Please try again.'
             : null
         );
         this.timelineMessage.set(
           result.events.length
             ? null
-            : 'No milestones available yet. Keep contributing and check back soon.'
+            : 'No milestones available yet.'
         );
         this.isLoadingTimeline.set(false);
       },
       error: () => {
-        this.timelineError.set('Could not load your timeline right now. Please try again.');
+        this.timelineError.set('Could not load the timeline right now. Please try again.');
         this.timelineMessage.set('Unable to load milestones at this time.');
         this.isLoadingTimeline.set(false);
       },
@@ -819,14 +905,17 @@ export class DashboardComponent {
     this.viewMode.set('insights');
     this.insightsError.set(null);
 
+    const username = this.currentUsername();
+    if (!username) return;
+
     if (this.insightsData()) {
       return;
     }
 
     this.isLoadingInsights.set(true);
-    const createdAt = this.authService.user()?.created_at;
+    const createdAt = this.userProfile()?.created_at;
 
-    this.githubService.getRepositoryInsights(createdAt).subscribe({
+    this.githubService.getRepositoryInsights(username, createdAt).subscribe({
       next: (result) => {
         this.insightsData.set(result.entries);
         this.isLoadingInsights.set(false);
@@ -861,20 +950,24 @@ export class DashboardComponent {
   }
 
   onGenerateStory(): void {
+    const username = this.currentUsername();
+    if (!username) return;
+
     this.isGenerating.set(true);
     this.isImageGenerationEnabled.set(true);
     this.storyImageUrl.set(null);
     this.isGeneratingImage.set(false);
 
-    const createdAt = this.authService.user()?.created_at;
+    const createdAt = this.userProfile()?.created_at;
 
-    this.githubService.getAggregatedActivity(createdAt).pipe(
+    this.githubService.getAggregatedActivity(username, createdAt).pipe(
       switchMap((activity) => {
         this.aggregatedActivity.set(activity);
         return this.storyService.generateStory(
           this.selectedGenre(),
           this.selectedLanguage(),
           activity,
+          username,
           createdAt,
           activity.topRepositories
         );
@@ -889,12 +982,8 @@ export class DashboardComponent {
           return of(null);
         }
 
-        const username = this.authService.user()?.login;
         const activity = this.aggregatedActivity();
-
-        if (!username || !activity) {
-          return of(null);
-        }
+        if (!activity) return of(null);
 
         this.isGeneratingImage.set(true);
         return this.storyService.generateStoryImage(
@@ -1114,7 +1203,7 @@ export class DashboardComponent {
         pixelRatio: 2,
       });
       const link = document.createElement('a');
-      const username = this.authService.user()?.login || 'developer';
+      const username = this.currentUsername() || 'developer';
       link.download = `github-insights-${username}.png`;
       link.href = dataUrl;
       link.click();

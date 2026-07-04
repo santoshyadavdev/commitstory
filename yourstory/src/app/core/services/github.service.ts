@@ -11,6 +11,14 @@ import {
   YearlyRepoContribution,
 } from '../models/activity.models';
 
+export interface GitHubUserProfile {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  html_url: string;
+  created_at: string;
+}
+
 interface ContributionsResponse {
   year: number;
   commits: number;
@@ -35,26 +43,34 @@ export class GitHubService {
   private readonly http = inject(HttpClient);
 
   /**
-   * Fetches commit/issue/PR contributions for a given year.
+   * Fetches public profile info for a GitHub user.
    */
-  getContributions(year: number): Observable<ContributionsResponse> {
-    const params = new HttpParams().set('year', String(year));
+  getUser(username: string): Observable<GitHubUserProfile> {
+    const params = new HttpParams().set('username', username);
+    return this.http.get<GitHubUserProfile>('/api/github/user', { params });
+  }
+
+  /**
+   * Fetches commit/issue/PR contributions for a given username and year.
+   */
+  getContributions(username: string, year: number): Observable<ContributionsResponse> {
+    const params = new HttpParams().set('username', username).set('year', String(year));
     return this.http.get<ContributionsResponse>('/api/github/contributions', { params });
   }
 
   /**
-   * Fetches lifetime discussion totals for the authenticated user.
-   * GitHub's API does not expose year-scoped discussion counts.
+   * Fetches lifetime discussion totals for a GitHub user.
    */
-  getDiscussions(): Observable<DiscussionsResponse> {
-    return this.http.get<DiscussionsResponse>('/api/github/discussions');
+  getDiscussions(username: string): Observable<DiscussionsResponse> {
+    const params = new HttpParams().set('username', username);
+    return this.http.get<DiscussionsResponse>('/api/github/discussions', { params });
   }
 
   /**
-   * Fetches popular repository contributions for a given year.
+   * Fetches popular repository contributions for a given username and year.
    */
-  getRepositoryContributions(year: number): Observable<RepositoryContributionsResponse> {
-    const params = new HttpParams().set('year', String(year));
+  getRepositoryContributions(username: string, year: number): Observable<RepositoryContributionsResponse> {
+    const params = new HttpParams().set('username', username).set('year', String(year));
     return this.http.get<RepositoryContributionsResponse>(
       '/api/github/repository-contributions',
       { params }
@@ -62,10 +78,10 @@ export class GitHubService {
   }
 
   /**
-   * Fetches timeline milestone data used by the dashboard timeline view.
+   * Fetches timeline milestone data for a given username.
    */
-  getMilestones(): Observable<TimelineData> {
-    return this.http.post<TimelineData>('/api/github/milestones', {}).pipe(
+  getMilestones(username: string, accountCreatedAt?: string | null): Observable<TimelineData> {
+    return this.http.post<TimelineData>('/api/github/milestones', { username, accountCreatedAt: accountCreatedAt ?? null }).pipe(
       catchError(() =>
         of({
           username: '',
@@ -80,12 +96,12 @@ export class GitHubService {
   }
 
   /**
-   * Combines year-scoped contributions with lifetime discussion totals.
+   * Combines year-scoped contributions with lifetime discussion totals for a username.
    */
-  getYearlyActivity(year: number): Observable<YearlyActivity> {
+  getYearlyActivity(username: string, year: number): Observable<YearlyActivity> {
     return forkJoin([
-      this.getContributions(year),
-      this.getDiscussions(),
+      this.getContributions(username, year),
+      this.getDiscussions(username),
     ]).pipe(
       map(([contributions, discussions]) => ({
         year,
@@ -105,10 +121,11 @@ export class GitHubService {
    * capped at a maximum of 10 years, then aggregates the numeric fields by summing them.
    * Discussion counts are included once — they are already lifetime totals.
    *
+   * @param username - GitHub username to fetch data for.
    * @param createdAt - ISO 8601 date string of the GitHub account creation date.
    *                    Falls back to the last 4 years when not provided.
    */
-  getAggregatedActivity(createdAt?: string): Observable<ActivitySummary> {
+  getAggregatedActivity(username: string, createdAt?: string): Observable<ActivitySummary> {
     const currentYear = new Date().getFullYear();
     const MAX_YEARS = 10;
 
@@ -128,9 +145,9 @@ export class GitHubService {
     }
 
     return forkJoin({
-      contributions: forkJoin(years.map((year) => this.getContributions(year))),
-      discussions: this.getDiscussions(),
-      repoContributions: forkJoin(years.map((year) => this.getRepositoryContributions(year))),
+      contributions: forkJoin(years.map((year) => this.getContributions(username, year))),
+      discussions: this.getDiscussions(username),
+      repoContributions: forkJoin(years.map((year) => this.getRepositoryContributions(username, year))),
     }).pipe(
       map(({ contributions, discussions, repoContributions }) => {
         // Merge repository contributions across years, deduplicating by nameWithOwner
@@ -168,8 +185,11 @@ export class GitHubService {
   /**
    * Fetches repository contribution insights from account creation year to current year,
    * capped at a maximum of 10 years, and merges per-repository activity across years.
+   *
+   * @param username - GitHub username to fetch data for.
+   * @param createdAt - ISO 8601 date string of the GitHub account creation date.
    */
-  getRepositoryInsights(createdAt?: string): Observable<RepositoryInsightsResponse> {
+  getRepositoryInsights(username: string, createdAt?: string): Observable<RepositoryInsightsResponse> {
     const currentYear = new Date().getFullYear();
     const MAX_YEARS = 10;
     const TOP_REPOSITORIES_LIMIT = 10;
@@ -187,7 +207,7 @@ export class GitHubService {
       years.push(y);
     }
 
-    return forkJoin(years.map((year) => this.getRepositoryContributions(year))).pipe(
+    return forkJoin(years.map((year) => this.getRepositoryContributions(username, year))).pipe(
       map((yearlyResults) => {
         const repoMap = new Map<string, RepositoryInsight>();
 
