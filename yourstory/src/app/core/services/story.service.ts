@@ -19,6 +19,7 @@ export interface StoryResponse {
   genre: string;
   year?: number;
   imageGenerationEnabled?: boolean;
+  shareUrl?: string;
 }
 
 export interface ImageGenerationRequest {

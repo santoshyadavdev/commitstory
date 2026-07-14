@@ -223,6 +223,14 @@ import { SharePlatform } from '../../core/constants/share.constants';
 
             @if (generatedStory()) {
               <div class="flex justify-end gap-2">
+                @if (generatedStory()?.shareUrl) {
+                  <button
+                    class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
+                    (click)="copyShareLink()"
+                  >
+                    <span>{{ linkCopied() ? '✅ Copied!' : '🔗 Copy Share Link' }}</span>
+                  </button>
+                }
                 <app-share-dropdown [onShare]="storyShareHandler"></app-share-dropdown>
                 <button
                   class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
@@ -800,6 +808,7 @@ export class DashboardComponent {
   readonly isImageGenerationEnabled = signal(true);
   readonly isGeneratingImage = signal(false);
   readonly isDownloading = signal(false);
+  readonly linkCopied = signal(false);
   readonly isLoadingTimeline = signal(false);
   readonly isDownloadingTimeline = signal(false);
   readonly isLoadingInsights = signal(false);
@@ -1207,6 +1216,26 @@ export class DashboardComponent {
         return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300';
       default:
         return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+    }
+  }
+
+  async copyShareLink(): Promise<void> {
+    const url = this.generatedStory()?.shareUrl;
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.linkCopied.set(true);
+      setTimeout(() => this.linkCopied.set(false), 2000);
+    } catch {
+      // Fallback: select from a temporary input
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      this.linkCopied.set(true);
+      setTimeout(() => this.linkCopied.set(false), 2000);
     }
   }
 
