@@ -1103,12 +1103,26 @@ async function handleGenerateStory(
     const parsedTitle = titleAndStoryMatch?.[1]?.trim() || fallbackTitle;
     const parsedStory = titleAndStoryMatch?.[2]?.trim() || rawResponse;
 
+    // Persist story to KV for shareable URLs (fire-and-forget)
+    const storyKey = `${username}:${genre}`;
+    const storyData = JSON.stringify({
+      title: parsedTitle,
+      story: parsedStory,
+      genre,
+      username,
+      updatedAt: new Date().toISOString(),
+    });
+    env.STORY_KV.put(storyKey, storyData).catch((err) =>
+      console.error('Failed to persist story to KV:', err)
+    );
+
     return json({
       title: parsedTitle,
       story: parsedStory,
       genre,
       label: 'Career Summary',
       imageGenerationEnabled: isStoryImageGenerationEnabled(env),
+      shareUrl: `/story/${username}/${genre}`,
     });
   } catch (err) {
     console.error('Story generation error:', err);
