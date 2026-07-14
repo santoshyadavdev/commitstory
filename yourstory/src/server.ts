@@ -26,6 +26,10 @@ interface Env {
   GITHUB_TOKEN?: string;
   /** Bound asset fetcher for static files from dist/yourstory/browser */
   ASSETS: Fetcher;
+  /** KV namespace for persisting story text/metadata */
+  STORY_KV: KVNamespace;
+  /** R2 bucket for persisting generated story images */
+  STORY_IMAGES: R2Bucket;
 }
 
 interface SessionUser {
