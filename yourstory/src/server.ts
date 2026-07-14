@@ -1116,7 +1116,8 @@ async function handleGenerateStory(
       });
       try {
         await env.STORY_KV.put(storyKey, storyData);
-        shareUrl = `/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`;
+        const origin = new URL(request.url).origin;
+        shareUrl = `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`;
       } catch (err) {
         console.error('Failed to persist story to KV:', err);
       }
