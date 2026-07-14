@@ -1205,6 +1205,36 @@ async function handleGenerateStoryImage(
       throw new Error('No image data returned by model');
     }
 
+    // Decode base64 image and persist to R2 (fire-and-forget)
+    const imageKey = `images/${username.toLowerCase()}/${(genre as string).toLowerCase()}.png`;
+    try {
+      const binaryString = atob(imageData.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      env.STORY_IMAGES.put(imageKey, bytes.buffer, {
+        httpMetadata: { contentType: imageData.mimeType || 'image/png' },
+      }).catch((putErr) => console.error('Failed to persist image to R2:', putErr));
+
+      // Update KV entry with imageKey
+      const storyKey = `${username}:${genre}`;
+      env.STORY_KV.get(storyKey).then((existing) => {
+        if (existing) {
+          try {
+            const data = JSON.parse(existing);
+            data.imageKey = imageKey;
+            data.updatedAt = new Date().toISOString();
+            env.STORY_KV.put(storyKey, JSON.stringify(data)).catch((kvErr) =>
+              console.error('Failed to update KV with imageKey:', kvErr)
+            );
+          } catch { /* ignore parse errors */ }
+        }
+      }).catch((kvErr) => console.error('Failed to read KV for imageKey update:', kvErr));
+    } catch (uploadErr) {
+      console.error('Failed to decode/upload image to R2:', uploadErr);
+    }
+
     return json({ imageUrl: `data:${imageData.mimeType};base64,${imageData.data}` });
   } catch (err) {
     console.error('Story image generation error:', err);
