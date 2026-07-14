@@ -964,12 +964,13 @@ async function handleGenerateStory(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const { genre, language, activity, createdAt, topRepositories, username } = (await request.json()) as {
+  const { genre, language, activity, createdAt, topRepositories, username, forceRegenerate } = (await request.json()) as {
     genre?: unknown;
     language?: unknown;
     activity?: unknown;
     createdAt?: string;
     username?: string;
+    forceRegenerate?: boolean;
     topRepositories?: Array<{
       name: string;
       nameWithOwner: string;
@@ -994,6 +995,33 @@ async function handleGenerateStory(
   }
   if (!activity || typeof activity !== 'object') {
     return json({ error: 'activity must be a contribution data object' }, 400);
+  }
+
+  // Check KV cache for existing story (skip GitHub API + Gemini calls)
+  if (!forceRegenerate && isValidStoryParam(username) && isValidStoryParam(genre as string)) {
+    try {
+      const storyKey = buildStoryKey(username, genre as string);
+      const cached = await env.STORY_KV.get(storyKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.title === 'string' && typeof parsed.story === 'string') {
+          const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${storyKey}:imageKey`)) ?? undefined;
+          const origin = new URL(request.url).origin;
+          return json({
+            title: parsed.title,
+            story: parsed.story,
+            genre: parsed.genre ?? genre,
+            label: 'Career Summary',
+            imageGenerationEnabled: isStoryImageGenerationEnabled(env),
+            shareUrl: `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`,
+            cached: true,
+            ...(imageKey ? { imageUrl: `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}/image` } : {}),
+          });
+        }
+      }
+    } catch {
+      // Cache miss or parse error — fall through to generate
+    }
   }
 
   const apiKey = env.GOOGLE_AI_API_KEY;

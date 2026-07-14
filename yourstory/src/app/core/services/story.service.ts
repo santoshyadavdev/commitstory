@@ -11,6 +11,7 @@ export interface StoryRequest {
   createdAt?: string;
   username: string;
   topRepositories?: RepositoryContribution[];
+  forceRegenerate?: boolean;
 }
 
 export interface StoryResponse {
@@ -20,6 +21,8 @@ export interface StoryResponse {
   year?: number;
   imageGenerationEnabled?: boolean;
   shareUrl?: string;
+  cached?: boolean;
+  imageUrl?: string;
 }
 
 export interface ImageGenerationRequest {
@@ -59,9 +62,10 @@ export class StoryService {
     activity: ActivitySummary,
     username: string,
     createdAt?: string,
-    topRepositories?: RepositoryContribution[]
+    topRepositories?: RepositoryContribution[],
+    forceRegenerate?: boolean,
   ): Observable<StoryResponse> {
-    const body: StoryRequest = { genre, language, activity, username, createdAt, topRepositories };
+    const body: StoryRequest = { genre, language, activity, username, createdAt, topRepositories, forceRegenerate };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
   }
 
