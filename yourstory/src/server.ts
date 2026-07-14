@@ -26,6 +26,10 @@ interface Env {
   GITHUB_TOKEN?: string;
   /** Bound asset fetcher for static files from dist/yourstory/browser */
   ASSETS: Fetcher;
+  /** KV namespace for persisting story text/metadata */
+  STORY_KV: KVNamespace;
+  /** R2 bucket for persisting generated story images */
+  STORY_IMAGES: R2Bucket;
 }
 
 interface SessionUser {
@@ -960,12 +964,13 @@ async function handleGenerateStory(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  const { genre, language, activity, createdAt, topRepositories, username } = (await request.json()) as {
+  const { genre, language, activity, createdAt, topRepositories, username, forceRegenerate } = (await request.json()) as {
     genre?: unknown;
     language?: unknown;
     activity?: unknown;
     createdAt?: string;
     username?: string;
+    forceRegenerate?: boolean;
     topRepositories?: Array<{
       name: string;
       nameWithOwner: string;
@@ -990,6 +995,33 @@ async function handleGenerateStory(
   }
   if (!activity || typeof activity !== 'object') {
     return json({ error: 'activity must be a contribution data object' }, 400);
+  }
+
+  // Check KV cache for existing story (skip GitHub API + Gemini calls)
+  if (!forceRegenerate && isValidStoryParam(username) && isValidStoryParam(genre as string)) {
+    try {
+      const storyKey = buildStoryKey(username, genre as string);
+      const cached = await env.STORY_KV.get(storyKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.title === 'string' && typeof parsed.story === 'string') {
+          const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${storyKey}:imageKey`)) ?? undefined;
+          const origin = new URL(request.url).origin;
+          return json({
+            title: parsed.title,
+            story: parsed.story,
+            genre: parsed.genre ?? genre,
+            label: 'Career Summary',
+            imageGenerationEnabled: isStoryImageGenerationEnabled(env),
+            shareUrl: `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`,
+            cached: true,
+            ...(imageKey ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}` } : {}),
+          });
+        }
+      }
+    } catch {
+      // Cache miss or parse error — fall through to generate
+    }
   }
 
   const apiKey = env.GOOGLE_AI_API_KEY;
@@ -1099,12 +1131,33 @@ async function handleGenerateStory(
     const parsedTitle = titleAndStoryMatch?.[1]?.trim() || fallbackTitle;
     const parsedStory = titleAndStoryMatch?.[2]?.trim() || rawResponse;
 
+    // Persist story to KV for shareable URLs (awaited so /story link works immediately)
+    let shareUrl: string | undefined;
+    if (isValidStoryParam(username) && isValidStoryParam(genre as string)) {
+      const storyKey = buildStoryKey(username, genre as string);
+      const storyData = JSON.stringify({
+        title: parsedTitle,
+        story: parsedStory,
+        genre,
+        username,
+        updatedAt: new Date().toISOString(),
+      });
+      try {
+        await env.STORY_KV.put(storyKey, storyData);
+        const origin = new URL(request.url).origin;
+        shareUrl = `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`;
+      } catch (err) {
+        console.error('Failed to persist story to KV:', err);
+      }
+    }
+
     return json({
       title: parsedTitle,
       story: parsedStory,
       genre,
       label: 'Career Summary',
       imageGenerationEnabled: isStoryImageGenerationEnabled(env),
+      ...(shareUrl ? { shareUrl } : {}),
     });
   } catch (err) {
     console.error('Story generation error:', err);
@@ -1187,11 +1240,197 @@ async function handleGenerateStoryImage(
       throw new Error('No image data returned by model');
     }
 
+    // Decode base64 image and persist to R2
+    if (isValidStoryParam(username) && isValidStoryParam(genre as string)) {
+      const imageKey = `images/${username.toLowerCase()}/${(genre as string).toLowerCase()}.png`;
+      try {
+        const binaryString = atob(imageData.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        // Await R2 upload before publishing imageKey to KV
+        await env.STORY_IMAGES.put(imageKey, bytes.buffer, {
+          httpMetadata: { contentType: imageData.mimeType || 'image/png' },
+        });
+
+        // Store imageKey separately to avoid read-modify-write race with story generation
+        const imageMetaKey = `${buildStoryKey(username, genre as string)}:imageKey`;
+        await env.STORY_KV.put(imageMetaKey, imageKey);
+      } catch (uploadErr) {
+        console.error('Failed to decode/upload image to R2:', uploadErr);
+      }
+    }
+
     return json({ imageUrl: `data:${imageData.mimeType};base64,${imageData.data}` });
   } catch (err) {
     console.error('Story image generation error:', err);
     return json({ error: 'Failed to generate story image' }, 500);
   }
+}
+
+/**
+ * GET /api/stories/image/{handle}/{genre}
+ * Serves a story image from R2.
+ */
+async function handleServeStoryImage(
+  handle: string,
+  genre: string,
+  env: Env,
+): Promise<Response> {
+  const imageKey = `images/${handle.toLowerCase()}/${genre.toLowerCase()}.png`;
+  const object = await env.STORY_IMAGES.get(imageKey);
+
+  if (!object) {
+    return new Response('Image not found', { status: 404 });
+  }
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType ?? 'image/png',
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
+}
+
+/**
+ * GET /story/{handle}/{genre}
+ * Server-rendered HTML share page with Open Graph meta tags.
+ */
+/** Validates that a handle/genre contain only safe characters (no slashes, colons, or control chars). */
+function isValidStoryParam(value: string): boolean {
+  return /^[a-zA-Z0-9_\-.]+$/.test(value);
+}
+
+/** Builds a collision-safe KV key from handle and genre. */
+function buildStoryKey(handle: string, genre: string): string {
+  return `${handle}:${genre}`;
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function handleSharePage(
+  handle: string,
+  genre: string,
+  env: Env,
+  requestUrl: string,
+): Promise<Response> {
+  const storyKey = buildStoryKey(handle, genre);
+  const raw = await env.STORY_KV.get(storyKey);
+
+  const safeHandle = escapeHtml(handle);
+  const safeGenre = escapeHtml(genre);
+
+  if (!raw) {
+    return new Response(
+      `<!DOCTYPE html><html><head><title>Story Not Found</title></head>` +
+      `<body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#1a1a2e;color:#fff;">` +
+      `<div style="text-align:center"><h1>Story Not Found</h1><p>No story found for <strong>${safeHandle}</strong> in the <strong>${safeGenre}</strong> genre.</p>` +
+      `<a href="/" style="color:#f97316;text-decoration:underline">Generate your story →</a></div></body></html>`,
+      { status: 404, headers: { 'Content-Type': 'text/html;charset=utf-8' } },
+    );
+  }
+
+  let story: {
+    title: string;
+    story: string;
+    genre: string;
+    username: string;
+    imageKey?: string;
+    updatedAt?: string;
+  };
+  try {
+    story = JSON.parse(raw);
+    if (
+      !story ||
+      typeof story.story !== 'string' ||
+      typeof story.title !== 'string' ||
+      typeof story.genre !== 'string' ||
+      typeof story.username !== 'string' ||
+      (story.imageKey !== undefined && typeof story.imageKey !== 'string')
+    ) {
+      throw new Error('malformed story payload');
+    }
+  } catch {
+    return new Response(
+      `<!DOCTYPE html><html><head><title>Error</title></head>` +
+      `<body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#1a1a2e;color:#fff;">` +
+      `<div style="text-align:center"><h1>Something went wrong</h1><p>Could not load the story. Please try generating it again.</p>` +
+      `<a href="/" style="color:#f97316;text-decoration:underline">Generate your story →</a></div></body></html>`,
+      { status: 500, headers: { 'Content-Type': 'text/html;charset=utf-8' } },
+    );
+  }
+
+  // Check separate imageKey entry (avoids race with story generation)
+  const imageMetaKey = `${buildStoryKey(handle, genre)}:imageKey`;
+  const storedImageKey = story.imageKey || await env.STORY_KV.get(imageMetaKey);
+
+  const origin = new URL(requestUrl).origin;
+  const pageUrl = `${origin}/story/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`;
+  const imageUrl = storedImageKey
+    ? `${origin}/api/stories/image/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`
+    : '';
+  const description = story.story.slice(0, 200).replace(/\n/g, ' ') + '…';
+  const escapedTitle = escapeHtml(story.title);
+  const escapedDescription = escapeHtml(description);
+  const escapedGenre = escapeHtml(story.genre);
+  const escapedUsername = escapeHtml(story.username);
+  const escapedStory = escapeHtml(story.story).replace(/\n/g, '<br/>');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapedTitle} — CommitStory</title>
+  <meta name="description" content="${escapedDescription}" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="${escapedTitle}" />
+  <meta property="og:description" content="${escapedDescription}" />
+  <meta property="og:url" content="${pageUrl}" />
+  ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="${imageUrl ? 'summary_large_image' : 'summary'}" />
+  <meta name="twitter:title" content="${escapedTitle}" />
+  <meta name="twitter:description" content="${escapedDescription}" />
+  ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .badge { display: inline-block; background: #f97316; color: #fff; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; }
+    h1 { font-size: 2rem; margin: 1rem 0 0.5rem; color: #fff; line-height: 1.3; }
+    .meta { color: #9ca3af; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .hero-img { width: 100%; border-radius: 0.75rem; margin-bottom: 1.5rem; }
+    .story { font-size: 1.125rem; line-height: 1.8; color: #d1d5db; }
+    .cta { display: inline-block; margin-top: 2rem; background: #f97316; color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; }
+    .cta:hover { background: #ea580c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">${escapedGenre}</span>
+    <h1>${escapedTitle}</h1>
+    <p class="meta">A story for <strong>${escapedUsername}</strong></p>
+    ${imageUrl ? `<img class="hero-img" src="${imageUrl}" alt="${escapedTitle}" />` : ''}
+    <div class="story">${escapedStory}</div>
+    <a class="cta" href="/">Generate your own story →</a>
+  </div>
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html;charset=utf-8',
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
 }
 
 // ─── Workers Entry Point ──────────────────────────────────────────────────────
@@ -1245,6 +1484,26 @@ export default {
       response = await handleGenerateStory(request, env);
     } else if (path === '/api/stories/generate-image' && method === 'POST') {
       response = await handleGenerateStoryImage(request, env);
+    } else if (path.startsWith('/api/stories/image/') && method === 'GET') {
+      const segments = path.split('/');
+      // /api/stories/image/{handle}/{genre} → segments: ['', 'api', 'stories', 'image', handle, genre]
+      const handle = decodeURIComponent(segments[4] || '');
+      const storyGenre = decodeURIComponent(segments[5] || '');
+      if (handle && storyGenre && segments.length === 6 && isValidStoryParam(handle) && isValidStoryParam(storyGenre)) {
+        response = await handleServeStoryImage(handle, storyGenre, env);
+      } else {
+        response = new Response('Not found', { status: 404 });
+      }
+    } else if (path.startsWith('/story/') && method === 'GET') {
+      const segments = path.split('/');
+      // /story/{handle}/{genre} → segments: ['', 'story', handle, genre]
+      const handle = decodeURIComponent(segments[2] || '');
+      const storyGenre = decodeURIComponent(segments[3] || '');
+      if (handle && storyGenre && segments.length === 4 && isValidStoryParam(handle) && isValidStoryParam(storyGenre)) {
+        response = await handleSharePage(handle, storyGenre, env, request.url);
+      } else {
+        response = new Response('Not found', { status: 404 });
+      }
     } else {
       // Try Angular SSR
       const angularResponse = await angularApp.handle(request, { env, ctx });

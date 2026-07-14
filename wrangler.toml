@@ -12,6 +12,14 @@ ENABLE_STORY_IMAGE_GENERATION = "true"
 directory = "dist/yourstory/browser"
 binding = "ASSETS"
 
+[[kv_namespaces]]
+binding = "STORY_KV"
+id = "a689f233e0954afab18f1ea71b40deb0"
+
+[[r2_buckets]]
+binding = "STORY_IMAGES"
+bucket_name = "commitstory-images"
+
 # Add secrets via the Cloudflare dashboard or:
 #   wrangler secret put GOOGLE_AI_API_KEY
 #   wrangler secret put GITHUB_TOKEN        ← required: GitHub PAT with read:user scope
