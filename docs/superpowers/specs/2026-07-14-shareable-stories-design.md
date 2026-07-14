@@ -47,7 +47,7 @@ After generating the story, automatically save to KV:
 KV.put(`${username}:${genre}`, JSON.stringify({ title, story, genre, username, updatedAt }))
 ```
 
-Response unchanged — still returns `{ title, story, genre, label, imageGenerationEnabled }`.
+Response now includes `shareUrl` field (e.g. `/story/santoshyadavdev/Comedy`) when username and genre pass validation. Returns `{ title, story, genre, label, imageGenerationEnabled, shareUrl? }`.
 
 ### Modified: `POST /api/stories/generate-image`
 
@@ -57,7 +57,7 @@ After generating the image, decode base64 and save to R2:
 R2.put(`images/${username}/${genre.toLowerCase()}.png`, imageBuffer, { httpMetadata: { contentType: 'image/png' } })
 ```
 
-Also update the KV entry to add the `imageKey`.
+Writes a separate KV entry `${username}:${genre}:imageKey` containing the R2 key (avoids read-modify-write race with story generation).
 
 Response unchanged — still returns `{ imageUrl: "data:..." }`.
 

@@ -81,6 +81,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               type="text"
               class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
               placeholder="Enter GitHub username…"
+              aria-label="GitHub username"
               [ngModel]="usernameInput()"
               (ngModelChange)="usernameInput.set($event)"
               name="story-username"
@@ -255,6 +256,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               type="text"
               class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
               placeholder="Enter GitHub username…"
+              aria-label="GitHub username"
               [ngModel]="usernameInput()"
               (ngModelChange)="usernameInput.set($event)"
               name="timeline-username"
@@ -292,6 +294,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           }
 
+          @if (currentUsername()) {
           <div #timelineCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
             <!-- Header -->
             <div class="flex items-center justify-between mb-6">
@@ -584,6 +587,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               </button>
             </div>
           }
+          } <!-- end @if currentUsername for timeline -->
         }
 
         @if (viewMode() === 'insights') {
@@ -592,6 +596,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               type="text"
               class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
               placeholder="Enter GitHub username…"
+              aria-label="GitHub username"
               [ngModel]="usernameInput()"
               (ngModelChange)="usernameInput.set($event)"
               name="insights-username"
@@ -629,6 +634,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           }
 
+          @if (currentUsername()) {
           <div #insightsShareCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 shadow-lg mb-4 border border-gray-200 dark:border-gray-800">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div class="flex items-center gap-3">
@@ -745,6 +751,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               <span class="text-xs text-gray-400 dark:text-gray-600 font-mono">commitstory</span>
             </div>
           </div>
+          } <!-- end @if currentUsername for insights -->
         }
         
       </div>

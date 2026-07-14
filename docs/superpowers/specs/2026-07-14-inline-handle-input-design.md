@@ -9,17 +9,20 @@ The GitHub handle input is a separate top-level search bar. Users must search fi
 Remove the top-level search bar and landing page. Show tabs immediately. Each tab has an inline handle input alongside its controls, sharing one `usernameInput` signal.
 
 ### Generate Story tab
-```
+
+```text
 [GitHub handle input] [Genre ▾] [Language ▾] [✨ Generate Story]
 ```
 
 ### Timeline tab
-```
+
+```text
 [GitHub handle input] [🔍 View Timeline]
 ```
 
 ### Insights tab
-```
+
+```text
 [GitHub handle input] [🔍 View Insights]
 ```
 

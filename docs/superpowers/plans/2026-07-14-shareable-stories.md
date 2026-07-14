@@ -80,7 +80,7 @@ git commit -m "feat: add KV and R2 bindings for shareable stories"
 
 - [ ] **Step 1: Add KV write after story generation**
 
-In `handleGenerateStory`, after `parsedStory` is computed (line 1100) and before the `return json(...)` (line 1102), add a non-blocking KV write using `ctx.waitUntil`. But since `handleGenerateStory` doesn't receive `ctx`, we need to pass `env` only — use a fire-and-forget approach via `env.STORY_KV.put(...)` wrapped in a try/catch so failures don't block the response.
+In `handleGenerateStory`, after `parsedStory` is computed and before the `return json(...)`, await the KV write so the share page link works immediately after generation. Wrap in try/catch so KV failures don't break the response. Validate username/genre with `isValidStoryParam()` before writing.
 
 Replace lines 1102-1108 with:
 
