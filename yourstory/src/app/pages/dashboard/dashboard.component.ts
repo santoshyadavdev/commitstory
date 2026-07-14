@@ -98,16 +98,6 @@ import { SharePlatform } from '../../core/constants/share.constants';
         <div class="inline-flex bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-1 mb-8">
           <button
             class="px-4 py-2 text-sm rounded-md transition-colors"
-            [class.bg-coderabbit-orange]="viewMode() === 'timeline'"
-            [class.text-white]="viewMode() === 'timeline'"
-            [class.text-gray-600]="viewMode() !== 'timeline'"
-            [class.dark:text-gray-300]="viewMode() !== 'timeline'"
-            (click)="onViewTimeline()"
-          >
-            Timeline
-          </button>
-          <button
-            class="px-4 py-2 text-sm rounded-md transition-colors"
             [class.bg-coderabbit-orange]="viewMode() === 'story'"
             [class.text-white]="viewMode() === 'story'"
             [class.text-gray-600]="viewMode() !== 'story'"
@@ -115,6 +105,16 @@ import { SharePlatform } from '../../core/constants/share.constants';
             (click)="setViewMode('story')"
           >
             Generate Story
+          </button>
+          <button
+            class="px-4 py-2 text-sm rounded-md transition-colors"
+            [class.bg-coderabbit-orange]="viewMode() === 'timeline'"
+            [class.text-white]="viewMode() === 'timeline'"
+            [class.text-gray-600]="viewMode() !== 'timeline'"
+            [class.dark:text-gray-300]="viewMode() !== 'timeline'"
+            (click)="onViewTimeline()"
+          >
+            Timeline
           </button>
           <button
             class="px-4 py-2 text-sm rounded-md transition-colors"
@@ -747,7 +747,7 @@ export class DashboardComponent {
   readonly isSearching = signal(false);
   readonly searchError = signal<string | null>(null);
 
-  readonly viewMode = signal<'story' | 'timeline' | 'insights'>('timeline');
+  readonly viewMode = signal<'story' | 'timeline' | 'insights'>('story');
   readonly expandedMilestone = signal<number | null>(null);
   readonly expandedRepo = signal<string | null>(null);
   readonly selectedGenre = signal<string>(GENRES[0] as string);
