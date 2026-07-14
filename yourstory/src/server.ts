@@ -1015,7 +1015,7 @@ async function handleGenerateStory(
             imageGenerationEnabled: isStoryImageGenerationEnabled(env),
             shareUrl: `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`,
             cached: true,
-            ...(imageKey ? { imageUrl: `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}/image` } : {}),
+            ...(imageKey ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}` } : {}),
           });
         }
       }
