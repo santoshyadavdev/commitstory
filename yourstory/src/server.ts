@@ -1297,6 +1297,9 @@ async function handleSharePage(
   };
   try {
     story = JSON.parse(raw);
+    if (!story || typeof story.story !== 'string' || typeof story.title !== 'string') {
+      throw new Error('malformed story payload');
+    }
   } catch {
     return new Response(
       `<!DOCTYPE html><html><head><title>Error</title></head>` +
@@ -1321,7 +1324,7 @@ async function handleSharePage(
   const escapedDescription = escapeHtml(description);
   const escapedGenre = escapeHtml(story.genre);
   const escapedUsername = escapeHtml(story.username);
-  const escapedStory = story.story.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br/>');
+  const escapedStory = escapeHtml(story.story).replace(/\n/g, '<br/>');
 
   const html = `<!DOCTYPE html>
 <html lang="en">

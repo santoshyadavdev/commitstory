@@ -93,6 +93,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Genre</label>
               <select
                 id="story-genre"
+                name="genre"
                 class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
                 [ngModel]="selectedGenre()"
                 (ngModelChange)="selectedGenre.set($event)"
@@ -107,6 +108,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
               <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Language</label>
               <select
                 id="story-language"
+                name="language"
                 class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
                 [ngModel]="selectedLanguage()"
                 (ngModelChange)="selectedLanguage.set($event)"

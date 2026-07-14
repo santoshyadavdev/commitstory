@@ -12,8 +12,10 @@ Persist stories in Cloudflare KV and images in Cloudflare R2. Serve shareable pa
 
 ### KV Namespace: `STORY_KV`
 
-- **Key format:** `{handle}:{genre}` (e.g. `santoshyadavdev:Comedy`)
-- **Value:** JSON
+Two-key model to avoid race conditions between story generation and image upload:
+
+- **Story key:** `{handle}:{genre}` (e.g. `santoshyadavdev:Comedy`)
+  - **Value:** JSON
 
 ```json
 {
@@ -21,10 +23,14 @@ Persist stories in Cloudflare KV and images in Cloudflare R2. Serve shareable pa
   "story": "Full story text...",
   "genre": "Comedy",
   "username": "santoshyadavdev",
-  "imageKey": "images/santoshyadavdev/comedy.png",
   "updatedAt": "2026-07-14T14:30:00Z"
 }
 ```
+
+- **Image metadata key:** `{handle}:{genre}:imageKey` (e.g. `santoshyadavdev:Comedy:imageKey`)
+  - **Value:** Plain string R2 key (e.g. `images/santoshyadavdev/comedy.png`)
+  - Written separately by the image generation handler to avoid read-modify-write races
+  - The share page reads this key as a fallback if `imageKey` is not in the story JSON
 
 ### R2 Bucket: `STORY_IMAGES`
 

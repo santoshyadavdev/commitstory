@@ -126,11 +126,9 @@ git commit -m "feat: persist generated stories to KV"
 **Files:**
 - Modify: `yourstory/src/server.ts:1185-1194` (inside `handleGenerateStoryImage`)
 
-- [ ] **Step 1: Add R2 write and KV update after image generation**
+- [ ] **Step 1: Add R2 write and separate KV imageKey entry after image generation**
 
-In `handleGenerateStoryImage`, after `imageData` is extracted (line 1185-1188) and before the `return json(...)` (line 1190), add R2 upload and KV update.
-
-Replace lines 1190-1190 with:
+In `handleGenerateStoryImage`, after `imageData` is extracted, add R2 upload and write the image key as a **separate KV entry** (`${username}:${genre}:imageKey`) instead of doing a read-modify-write on the story entry. This avoids a race condition where the image upload's KV read could execute before the story generation's KV write has completed, silently losing the imageKey.
 
 ```typescript
     // Decode base64 image and persist to R2 (fire-and-forget)
@@ -145,20 +143,11 @@ Replace lines 1190-1190 with:
         httpMetadata: { contentType: imageData.mimeType || 'image/png' },
       }).catch((err) => console.error('Failed to persist image to R2:', err));
 
-      // Update KV entry with imageKey
-      const storyKey = `${username}:${genre}`;
-      env.STORY_KV.get(storyKey).then((existing) => {
-        if (existing) {
-          try {
-            const data = JSON.parse(existing);
-            data.imageKey = imageKey;
-            data.updatedAt = new Date().toISOString();
-            env.STORY_KV.put(storyKey, JSON.stringify(data)).catch((err) =>
-              console.error('Failed to update KV with imageKey:', err)
-            );
-          } catch { /* ignore parse errors */ }
-        }
-      }).catch((err) => console.error('Failed to read KV for imageKey update:', err));
+      // Store imageKey separately to avoid read-modify-write race with story generation
+      const imageMetaKey = `${username}:${genre}:imageKey`;
+      env.STORY_KV.put(imageMetaKey, imageKey).catch((err) =>
+        console.error('Failed to write imageKey to KV:', err)
+      );
     } catch (err) {
       console.error('Failed to decode/upload image to R2:', err);
     }
