@@ -1217,20 +1217,11 @@ async function handleGenerateStoryImage(
         httpMetadata: { contentType: imageData.mimeType || 'image/png' },
       }).catch((putErr) => console.error('Failed to persist image to R2:', putErr));
 
-      // Update KV entry with imageKey
-      const storyKey = `${username}:${genre}`;
-      env.STORY_KV.get(storyKey).then((existing) => {
-        if (existing) {
-          try {
-            const data = JSON.parse(existing);
-            data.imageKey = imageKey;
-            data.updatedAt = new Date().toISOString();
-            env.STORY_KV.put(storyKey, JSON.stringify(data)).catch((kvErr) =>
-              console.error('Failed to update KV with imageKey:', kvErr)
-            );
-          } catch { /* ignore parse errors */ }
-        }
-      }).catch((kvErr) => console.error('Failed to read KV for imageKey update:', kvErr));
+      // Store imageKey separately to avoid read-modify-write race with story generation
+      const imageMetaKey = `${username}:${genre}:imageKey`;
+      env.STORY_KV.put(imageMetaKey, imageKey).catch((kvErr) =>
+        console.error('Failed to write imageKey to KV:', kvErr)
+      );
     } catch (uploadErr) {
       console.error('Failed to decode/upload image to R2:', uploadErr);
     }
@@ -1270,6 +1261,10 @@ async function handleServeStoryImage(
  * GET /story/{handle}/{genre}
  * Server-rendered HTML share page with Open Graph meta tags.
  */
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 async function handleSharePage(
   handle: string,
   genre: string,
@@ -1279,17 +1274,20 @@ async function handleSharePage(
   const storyKey = `${handle}:${genre}`;
   const raw = await env.STORY_KV.get(storyKey);
 
+  const safeHandle = escapeHtml(handle);
+  const safeGenre = escapeHtml(genre);
+
   if (!raw) {
     return new Response(
       `<!DOCTYPE html><html><head><title>Story Not Found</title></head>` +
       `<body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#1a1a2e;color:#fff;">` +
-      `<div style="text-align:center"><h1>Story Not Found</h1><p>No story found for <strong>${handle}</strong> in the <strong>${genre}</strong> genre.</p>` +
+      `<div style="text-align:center"><h1>Story Not Found</h1><p>No story found for <strong>${safeHandle}</strong> in the <strong>${safeGenre}</strong> genre.</p>` +
       `<a href="/" style="color:#f97316;text-decoration:underline">Generate your story →</a></div></body></html>`,
       { status: 404, headers: { 'Content-Type': 'text/html;charset=utf-8' } },
     );
   }
 
-  const story = JSON.parse(raw) as {
+  let story: {
     title: string;
     story: string;
     genre: string;
@@ -1297,15 +1295,32 @@ async function handleSharePage(
     imageKey?: string;
     updatedAt?: string;
   };
+  try {
+    story = JSON.parse(raw);
+  } catch {
+    return new Response(
+      `<!DOCTYPE html><html><head><title>Error</title></head>` +
+      `<body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#1a1a2e;color:#fff;">` +
+      `<div style="text-align:center"><h1>Something went wrong</h1><p>Could not load the story. Please try generating it again.</p>` +
+      `<a href="/" style="color:#f97316;text-decoration:underline">Generate your story →</a></div></body></html>`,
+      { status: 500, headers: { 'Content-Type': 'text/html;charset=utf-8' } },
+    );
+  }
+
+  // Check separate imageKey entry (avoids race with story generation)
+  const imageMetaKey = `${handle}:${genre}:imageKey`;
+  const storedImageKey = story.imageKey || await env.STORY_KV.get(imageMetaKey);
 
   const origin = new URL(requestUrl).origin;
-  const pageUrl = `${origin}/story/${handle}/${genre}`;
-  const imageUrl = story.imageKey
-    ? `${origin}/api/stories/image/${handle}/${genre}`
+  const pageUrl = `${origin}/story/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`;
+  const imageUrl = storedImageKey
+    ? `${origin}/api/stories/image/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`
     : '';
   const description = story.story.slice(0, 200).replace(/\n/g, ' ') + '…';
-  const escapedTitle = story.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const escapedDescription = description.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const escapedTitle = escapeHtml(story.title);
+  const escapedDescription = escapeHtml(description);
+  const escapedGenre = escapeHtml(story.genre);
+  const escapedUsername = escapeHtml(story.username);
   const escapedStory = story.story.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br/>');
 
   const html = `<!DOCTYPE html>
@@ -1344,9 +1359,9 @@ async function handleSharePage(
 </head>
 <body>
   <div class="container">
-    <span class="badge">${story.genre}</span>
+    <span class="badge">${escapedGenre}</span>
     <h1>${escapedTitle}</h1>
-    <p class="meta">A story for <strong>${story.username}</strong></p>
+    <p class="meta">A story for <strong>${escapedUsername}</strong></p>
     ${imageUrl ? `<img class="hero-img" src="${imageUrl}" alt="${escapedTitle}" />` : ''}
     <div class="story">${escapedStory}</div>
     <a class="cta" href="/">Generate your own story →</a>
