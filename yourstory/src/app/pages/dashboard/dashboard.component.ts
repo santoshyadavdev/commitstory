@@ -37,59 +37,6 @@ import { SharePlatform } from '../../core/constants/share.constants';
 
       <div class="max-w-5xl mx-auto">
 
-        <!-- Username search -->
-        <div class="mb-8">
-          <form (ngSubmit)="onSearchUser()" class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div class="flex flex-1 gap-2 w-full sm:w-auto">
-              <input
-                type="text"
-                id="github-username"
-                class="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder="Enter GitHub username…"
-                [ngModel]="usernameInput()"
-                (ngModelChange)="usernameInput.set($event)"
-                name="username"
-                autocomplete="off"
-                autocapitalize="off"
-                spellcheck="false"
-              />
-              <button
-                type="submit"
-                class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap"
-                [disabled]="isSearching() || !usernameInput().trim()"
-              >
-                @if (isSearching()) {
-                  <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                  <span>Loading…</span>
-                } @else {
-                  <span>🔍 View Story</span>
-                }
-              </button>
-            </div>
-          </form>
-          @if (searchError()) {
-            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ searchError() }}</p>
-          }
-          @if (userProfile(); as profile) {
-            <div class="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600" />
-              <span class="font-medium text-gray-900 dark:text-white">{{ profile.name || profile.login }}</span>
-              <span class="text-gray-400">·</span>
-              <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-coderabbit-orange hover:underline">@{{ profile.login }}</a>
-            </div>
-          }
-        </div>
-
-        @if (!currentUsername()) {
-          <!-- Landing prompt -->
-          <div class="flex flex-col items-center justify-center py-24 text-center">
-            <div class="text-6xl mb-6">🐇</div>
-            <h2 class="text-2xl font-bold mb-3 text-gray-900 dark:text-white">Explore Any GitHub Journey</h2>
-            <p class="text-gray-500 dark:text-gray-400 max-w-md">
-              Enter a GitHub username above to generate a career-spanning story, explore milestone timelines, and view repository insights — no login required.
-            </p>
-          </div>
-        } @else {
         <h2 class="text-3xl font-bold mb-4">GitHub Story</h2>
         <p class="text-gray-600 dark:text-gray-400 mb-8">
           Generate a career-spanning story or explore the milestone timeline based on GitHub activity.
@@ -112,7 +59,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             [class.text-white]="viewMode() === 'timeline'"
             [class.text-gray-600]="viewMode() !== 'timeline'"
             [class.dark:text-gray-300]="viewMode() !== 'timeline'"
-            (click)="onViewTimeline()"
+            (click)="setViewMode('timeline')"
           >
             Timeline
           </button>
@@ -122,16 +69,28 @@ import { SharePlatform } from '../../core/constants/share.constants';
             [class.text-white]="viewMode() === 'insights'"
             [class.text-gray-600]="viewMode() !== 'insights'"
             [class.dark:text-gray-300]="viewMode() !== 'insights'"
-            (click)="onViewInsights()"
+            (click)="setViewMode('insights')"
           >
             Insights
           </button>
         </div>
 
         @if (viewMode() === 'story') {
-          <div class="flex flex-wrap items-center gap-3 mb-8">
+          <form (ngSubmit)="onSearchAndGenerate()" class="flex flex-wrap items-center gap-3 mb-4">
+            <input
+              type="text"
+              class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
+              placeholder="Enter GitHub username…"
+              [ngModel]="usernameInput()"
+              (ngModelChange)="usernameInput.set($event)"
+              name="story-username"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+
             <div class="flex items-center gap-2">
-              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Story Genre</label>
+              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-genre">Genre</label>
               <select
                 id="story-genre"
                 class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
@@ -145,7 +104,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
 
             <div class="flex items-center gap-2">
-              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Story Language</label>
+              <label class="text-xs text-gray-600 dark:text-gray-400" for="story-language">Language</label>
               <select
                 id="story-language"
                 class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
@@ -159,18 +118,29 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
 
             <button
+              type="submit"
               class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              [disabled]="isGenerating()"
-              (click)="onGenerateStory()"
+              [disabled]="isGenerating() || isSearching() || !usernameInput().trim()"
             >
-              @if (isGenerating()) {
+              @if (isSearching() || isGenerating()) {
                 <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                <span>Generating…</span>
+                <span>{{ isSearching() ? 'Loading…' : 'Generating…' }}</span>
               } @else {
                 <span>✨ Generate Story</span>
               }
             </button>
-          </div>
+          </form>
+          @if (searchError()) {
+            <p class="mb-4 text-sm text-red-600 dark:text-red-400">{{ searchError() }}</p>
+          }
+          @if (userProfile(); as profile) {
+            <div class="mb-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600" />
+              <span class="font-medium text-gray-900 dark:text-white">{{ profile.name || profile.login }}</span>
+              <span class="text-gray-400">·</span>
+              <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-coderabbit-orange hover:underline">@{{ profile.login }}</a>
+            </div>
+          }
 
           @if (aggregatedActivity(); as activity) {
             <div #shareCard class="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg mb-4">
@@ -270,6 +240,42 @@ import { SharePlatform } from '../../core/constants/share.constants';
         }
 
         @if (viewMode() === 'timeline') {
+          <form (ngSubmit)="onSearchAndTimeline()" class="flex flex-wrap items-center gap-3 mb-4">
+            <input
+              type="text"
+              class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
+              placeholder="Enter GitHub username…"
+              [ngModel]="usernameInput()"
+              (ngModelChange)="usernameInput.set($event)"
+              name="timeline-username"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+            <button
+              type="submit"
+              class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              [disabled]="isSearching() || isLoadingTimeline() || !usernameInput().trim()"
+            >
+              @if (isSearching() || isLoadingTimeline()) {
+                <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                <span>Loading…</span>
+              } @else {
+                <span>🔍 View Timeline</span>
+              }
+            </button>
+          </form>
+          @if (searchError()) {
+            <p class="mb-4 text-sm text-red-600 dark:text-red-400">{{ searchError() }}</p>
+          }
+          @if (userProfile(); as profile) {
+            <div class="mb-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600" />
+              <span class="font-medium text-gray-900 dark:text-white">{{ profile.name || profile.login }}</span>
+              <span class="text-gray-400">·</span>
+              <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-coderabbit-orange hover:underline">@{{ profile.login }}</a>
+            </div>
+          }
           @if (timelineError()) {
             <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
               {{ timelineError() }}
@@ -571,6 +577,42 @@ import { SharePlatform } from '../../core/constants/share.constants';
         }
 
         @if (viewMode() === 'insights') {
+          <form (ngSubmit)="onSearchAndInsights()" class="flex flex-wrap items-center gap-3 mb-4">
+            <input
+              type="text"
+              class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
+              placeholder="Enter GitHub username…"
+              [ngModel]="usernameInput()"
+              (ngModelChange)="usernameInput.set($event)"
+              name="insights-username"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+            <button
+              type="submit"
+              class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              [disabled]="isSearching() || isLoadingInsights() || !usernameInput().trim()"
+            >
+              @if (isSearching() || isLoadingInsights()) {
+                <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                <span>Loading…</span>
+              } @else {
+                <span>🔍 View Insights</span>
+              }
+            </button>
+          </form>
+          @if (searchError()) {
+            <p class="mb-4 text-sm text-red-600 dark:text-red-400">{{ searchError() }}</p>
+          }
+          @if (userProfile(); as profile) {
+            <div class="mb-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600" />
+              <span class="font-medium text-gray-900 dark:text-white">{{ profile.name || profile.login }}</span>
+              <span class="text-gray-400">·</span>
+              <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-coderabbit-orange hover:underline">@{{ profile.login }}</a>
+            </div>
+          }
           @if (insightsError()) {
             <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
               {{ insightsError() }}
@@ -694,7 +736,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             </div>
           </div>
         }
-        } <!-- end @else currentUsername -->
+        
       </div>
     </div>
   `,
@@ -819,9 +861,15 @@ export class DashboardComponent {
     // Nothing auto-loaded — user must enter a username first
   }
 
-  onSearchUser(): void {
+  onSearchUser(afterLoad?: () => void): void {
     const username = this.usernameInput().trim();
     if (!username) return;
+
+    // If user is already loaded, skip the search and run the action directly
+    if (this.currentUsername() === username && this.userProfile()) {
+      afterLoad?.();
+      return;
+    }
 
     this.isSearching.set(true);
     this.searchError.set(null);
@@ -838,8 +886,7 @@ export class DashboardComponent {
         this.generatedStory.set(null);
         this.storyImageUrl.set(null);
         this.memberSinceYear.set(new Date(profile.created_at).getFullYear());
-        // Auto-load timeline for the new user
-        this.onViewTimeline();
+        afterLoad?.();
       },
       error: (err) => {
         const status = (err as { status?: number }).status;
@@ -847,6 +894,18 @@ export class DashboardComponent {
         this.isSearching.set(false);
       },
     });
+  }
+
+  onSearchAndGenerate(): void {
+    this.onSearchUser(() => this.onGenerateStory());
+  }
+
+  onSearchAndTimeline(): void {
+    this.onSearchUser(() => this.onViewTimeline());
+  }
+
+  onSearchAndInsights(): void {
+    this.onSearchUser(() => this.onViewInsights());
   }
 
   toggleMilestone(index: number): void {
