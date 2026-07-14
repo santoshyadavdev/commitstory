@@ -1075,7 +1075,7 @@ async function handleGenerateStory(
       contents: userPrompt,
       config: {
         systemInstruction,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 4096,
         temperature: 0.7,
       },
     });
