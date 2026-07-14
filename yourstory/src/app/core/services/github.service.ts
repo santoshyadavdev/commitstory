@@ -127,13 +127,10 @@ export class GitHubService {
    */
   getAggregatedActivity(username: string, createdAt?: string): Observable<ActivitySummary> {
     const currentYear = new Date().getFullYear();
-    const MAX_YEARS = 10;
 
     let startYear: number;
     if (createdAt) {
-      const creationYear = new Date(createdAt).getFullYear();
-      // Clamp to at most MAX_YEARS in the past
-      startYear = Math.max(creationYear, currentYear - MAX_YEARS + 1);
+      startYear = new Date(createdAt).getFullYear();
     } else {
       // Fallback: last 4 years (original behaviour)
       startYear = currentYear - 3;
@@ -165,8 +162,7 @@ export class GitHubService {
           }
         }
         const topRepositories = Array.from(repoMap.values())
-          .sort((a, b) => b.totalContributions - a.totalContributions)
-          .slice(0, 10);
+          .sort((a, b) => b.totalContributions - a.totalContributions);
 
         return {
           commits: contributions.reduce((sum, c) => sum + c.commits, 0),
@@ -191,13 +187,11 @@ export class GitHubService {
    */
   getRepositoryInsights(username: string, createdAt?: string): Observable<RepositoryInsightsResponse> {
     const currentYear = new Date().getFullYear();
-    const MAX_YEARS = 10;
     const TOP_REPOSITORIES_LIMIT = 10;
 
     let startYear: number;
     if (createdAt) {
-      const creationYear = new Date(createdAt).getFullYear();
-      startYear = Math.max(creationYear, currentYear - MAX_YEARS + 1);
+      startYear = new Date(createdAt).getFullYear();
     } else {
       startYear = currentYear - 3;
     }

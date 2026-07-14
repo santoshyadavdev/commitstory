@@ -598,9 +598,7 @@ async function handleRepositoryContributions(
     }
 
     const topRepositories = Array.from(repoMap.values())
-      .filter((r) => r.stargazerCount > 100)
-      .sort((a, b) => b.totalContributions - a.totalContributions)
-      .slice(0, 10);
+      .sort((a, b) => b.totalContributions - a.totalContributions);
 
     return json({ year, topRepositories });
   } catch (err) {
