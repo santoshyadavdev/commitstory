@@ -232,7 +232,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
                     <span>{{ linkCopied() ? '✅ Copied!' : '🔗 Copy Share Link' }}</span>
                   </button>
                 }
-                <app-share-dropdown [onShare]="storyShareHandler"></app-share-dropdown>
+                <app-share-dropdown [onShare]="storyShareHandler" [shareUrl]="generatedStory()?.shareUrl"></app-share-dropdown>
                 <button
                   class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
                   [disabled]="isDownloading()"
@@ -774,6 +774,7 @@ export class DashboardComponent {
     const bg = this.themeService.isDark() ? '#171717' : '#F6F6F1';
     const result = await this.shareService.shareWithImage(
       this.shareCard.nativeElement, platform, 'story', this.selectedGenre(), bg,
+      this.generatedStory()?.shareUrl,
     );
     this.showShareToast(result);
   };

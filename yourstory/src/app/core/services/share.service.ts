@@ -26,8 +26,9 @@ export class ShareService {
     type: ShareType,
     genre?: string,
     backgroundColor = '#F6F6F1',
+    storyUrl?: string,
   ): Promise<ShareResult> {
-    const shareUrl = this.getShareUrl(platform, type, genre);
+    const shareUrl = this.getShareUrl(platform, type, genre, storyUrl);
 
     try {
       const { toBlob } = await import('html-to-image');
@@ -49,18 +50,18 @@ export class ShareService {
   /**
    * Returns a fully-constructed share URL for the given platform.
    */
-  getShareUrl(platform: SharePlatform, type: ShareType, genre?: string): string {
+  getShareUrl(platform: SharePlatform, type: ShareType, genre?: string, storyUrl?: string): string {
     const username = this.authService.user()?.login ?? '';
 
     switch (platform) {
       case 'twitter':
-        return this.buildTwitterUrl(type, genre, username);
+        return this.buildTwitterUrl(type, genre, username, storyUrl);
       case 'linkedin':
-        return this.buildLinkedInUrl(type, genre, username);
+        return this.buildLinkedInUrl(type, genre, username, storyUrl);
       case 'whatsapp':
-        return this.buildWhatsAppUrl(type, genre, username);
+        return this.buildWhatsAppUrl(type, genre, username, storyUrl);
       case 'facebook':
-        return this.buildFacebookUrl();
+        return this.buildFacebookUrl(storyUrl);
       case 'instagram':
         // Instagram has no web share URL — image goes via clipboard only
         return 'https://www.instagram.com/';
@@ -83,25 +84,25 @@ export class ShareService {
     return 'Check out my GitHub developer timeline! 🗓️';
   }
 
-  private buildTwitterUrl(type: ShareType, genre: string | undefined, username: string): string {
+  private buildTwitterUrl(type: ShareType, genre: string | undefined, username: string, storyUrl?: string): string {
     const params = new URLSearchParams({
       text: this.getGenericText(type, genre) + ' Generated with CommitStory',
-      url: APP_URL,
+      url: storyUrl ?? APP_URL,
       via: CODERABBIT_HANDLE,
       hashtags: 'CommitStory',
     });
     return `${SHARE_BASE_URLS.twitter}?${params.toString()}`;
   }
 
-  private buildLinkedInUrl(type: ShareType, genre: string | undefined, username: string): string {
-    const shareUrl = username
+  private buildLinkedInUrl(type: ShareType, genre: string | undefined, username: string, storyUrl?: string): string {
+    const url = storyUrl ?? (username
       ? `${APP_URL}?ref=linkedin&user=${encodeURIComponent(username)}`
-      : APP_URL;
-    const params = new URLSearchParams({ url: shareUrl });
+      : APP_URL);
+    const params = new URLSearchParams({ url });
     return `${SHARE_BASE_URLS.linkedin}?${params.toString()}`;
   }
 
-  private buildWhatsAppUrl(type: ShareType, genre: string | undefined, username: string): string {
+  private buildWhatsAppUrl(type: ShareType, genre: string | undefined, username: string, storyUrl?: string): string {
     const contentLine = type === 'story'
       ? `I just generated my GitHub developer story${genre ? ` (${genre} genre)` : ''} with CommitStory! 🚀`
       : type === 'insights'
@@ -109,10 +110,12 @@ export class ShareService {
         : 'I just generated my GitHub developer timeline with CommitStory! 🗓️';
 
     const profileLine = username ? `\nMy GitHub profile: https://github.com/${username}` : '';
+    const storyLine = storyUrl ? `\nRead my story: ${storyUrl}` : '';
 
     const message = [
       contentLine,
       profileLine,
+      storyLine,
       `\nTry it yourself: ${APP_URL}`,
       `Powered by CodeRabbit: ${CODERABBIT_URL}`,
       `#CommitStory #coderabbit`,
@@ -122,8 +125,8 @@ export class ShareService {
     return `${SHARE_BASE_URLS.whatsapp}?${params.toString()}`;
   }
 
-  private buildFacebookUrl(): string {
-    const params = new URLSearchParams({ u: APP_URL });
+  private buildFacebookUrl(storyUrl?: string): string {
+    const params = new URLSearchParams({ u: storyUrl ?? APP_URL });
     return `${SHARE_BASE_URLS.facebook}?${params.toString()}`;
   }
 }

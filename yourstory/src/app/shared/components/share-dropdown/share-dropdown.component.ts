@@ -83,6 +83,19 @@ const PLATFORMS: PlatformOption[] = [
               <span>{{ platform.label }}</span>
             </button>
           }
+
+          @if (shareUrl) {
+            <div class="border-t border-gray-200 dark:border-gray-700">
+              <button
+                (click)="copyLink()"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left cursor-pointer"
+                role="menuitem"
+              >
+                <span class="text-base leading-none w-4 text-center" aria-hidden="true">{{ linkCopied() ? '✅' : '🔗' }}</span>
+                <span>{{ linkCopied() ? 'Link Copied!' : 'Copy Share Link' }}</span>
+              </button>
+            </div>
+          }
         </div>
       }
     </div>
@@ -90,9 +103,11 @@ const PLATFORMS: PlatformOption[] = [
 })
 export class ShareDropdownComponent {
   @Input({ required: true }) onShare!: (platform: SharePlatform) => void;
+  @Input() shareUrl?: string;
 
   readonly platforms = PLATFORMS;
   readonly open = signal(false);
+  readonly linkCopied = signal(false);
 
   toggle(event: MouseEvent): void {
     event.stopPropagation();
@@ -102,6 +117,22 @@ export class ShareDropdownComponent {
   select(platform: SharePlatform): void {
     this.open.set(false);
     this.onShare(platform);
+  }
+
+  async copyLink(): Promise<void> {
+    if (!this.shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(this.shareUrl);
+    } catch {
+      const input = document.createElement('input');
+      input.value = this.shareUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    this.linkCopied.set(true);
+    setTimeout(() => this.linkCopied.set(false), 2000);
   }
 
   @HostListener('document:click')
