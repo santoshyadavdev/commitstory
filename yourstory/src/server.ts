@@ -5,9 +5,6 @@
  * (`--configuration=cloudflare`). It intentionally avoids all Node.js-specific
  * imports (Express, express-session, node:path, node:crypto, dotenv) which
  * cannot run on the Workers runtime.
- *
- * Sessions are stored in a signed HttpOnly cookie (HMAC-SHA-256 via Web Crypto)
- * instead of express-session, so no server-side session store is required.
  */
 
 import { AngularAppEngine } from '@angular/ssr';
@@ -16,12 +13,8 @@ import { GoogleGenAI } from '@google/genai';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Env {
-  SESSION_SECRET: string;
   GOOGLE_AI_API_KEY: string;
   ENABLE_STORY_IMAGE_GENERATION?: string;
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-  GITHUB_CALLBACK_URL: string;
   /** Personal Access Token used for server-side GitHub API requests */
   GITHUB_TOKEN?: string;
   /** Bound asset fetcher for static files from dist/yourstory/browser */
@@ -32,120 +25,6 @@ interface Env {
   STORY_IMAGES: R2Bucket;
 }
 
-interface SessionUser {
-  id: number;
-  login: string;
-  name: string | null;
-  email: string | null;
-  avatar_url: string;
-  html_url: string;
-  created_at: string;
-}
-
-interface SessionData {
-  accessToken?: string;
-  user?: SessionUser;
-  oauthState?: string;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const COOKIE_NAME = 'cstory_sess';
-const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
-
-// ─── Signed Cookie Session Helpers ───────────────────────────────────────────
-
-function b64urlEncode(input: string): string {
-  return btoa(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-function b64urlDecode(input: string): string {
-  const padded = input.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = padded.length % 4;
-  return atob(pad ? padded + '='.repeat(4 - pad) : padded);
-}
-
-async function importHmacKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  );
-}
-
-async function encodeSession(data: SessionData, secret: string): Promise<string> {
-  const payload = b64urlEncode(unescape(encodeURIComponent(JSON.stringify(data))));
-  const key = await importHmacKey(secret);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
-  const sigB64 = b64urlEncode(String.fromCharCode(...new Uint8Array(sig)));
-  return `${payload}.${sigB64}`;
-}
-
-async function decodeSession(value: string, secret: string): Promise<SessionData | null> {
-  const dot = value.lastIndexOf('.');
-  if (dot === -1) return null;
-  const payload = value.slice(0, dot);
-  const sigB64 = value.slice(dot + 1);
-  let sigBytes: Uint8Array<ArrayBuffer>;
-  try {
-    sigBytes = Uint8Array.from(b64urlDecode(sigB64), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
-  } catch {
-    return null;
-  }
-  const key = await importHmacKey(secret);
-  const valid = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    sigBytes,
-    new TextEncoder().encode(payload),
-  );
-  if (!valid) return null;
-  try {
-    return JSON.parse(decodeURIComponent(escape(b64urlDecode(payload)))) as SessionData;
-  } catch {
-    return null;
-  }
-}
-
-async function getSession(request: Request, secret: string): Promise<SessionData> {
-  const cookieHeader = request.headers.get('cookie') ?? '';
-  for (const part of cookieHeader.split(';')) {
-    const eqIdx = part.indexOf('=');
-    if (eqIdx === -1) continue;
-    const name = part.slice(0, eqIdx).trim();
-    const value = part.slice(eqIdx + 1).trim();
-    if (name === COOKIE_NAME) {
-      return (await decodeSession(value, secret)) ?? {};
-    }
-  }
-  return {};
-}
-
-async function applySession(
-  response: Response,
-  session: SessionData | null,
-  secret: string,
-  secure: boolean,
-): Promise<Response> {
-  const headers = new Headers(response.headers);
-  if (session === null) {
-    // Clear the cookie
-    headers.append(
-      'Set-Cookie',
-      `${COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`,
-    );
-  } else {
-    const value = await encodeSession(session, secret);
-    headers.append(
-      'Set-Cookie',
-      `${COOKIE_NAME}=${value}; Max-Age=${SESSION_MAX_AGE}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`,
-    );
-  }
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-}
-
 // ─── Tiny Helpers ─────────────────────────────────────────────────────────────
 
 function json(data: unknown, status = 200): Response {
@@ -153,10 +32,6 @@ function json(data: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
-}
-
-function redirect(url: string, status = 302): Response {
-  return new Response(null, { status, headers: { Location: url } });
 }
 
 function isStoryImageGenerationEnabled(env: Env): boolean {
@@ -221,128 +96,6 @@ function extractInlineImageData(result: unknown): { data: string; mimeType: stri
   return null;
 }
 
-// ─── Route Handlers ───────────────────────────────────────────────────────────
-
-/**
- * GET /api/auth/github
- * Initiates the GitHub OAuth flow.
- */
-async function handleGitHubAuth(
-  env: Env,
-  session: SessionData,
-): Promise<{ response: Response; session: SessionData }> {
-  const state = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  const params = new URLSearchParams({
-    client_id: env.GITHUB_CLIENT_ID,
-    redirect_uri: env.GITHUB_CALLBACK_URL,
-    scope: 'read:user read:org',
-    state,
-  });
-
-  return {
-    response: redirect(`https://github.com/login/oauth/authorize?${params}`),
-    session: { ...session, oauthState: state },
-  };
-}
-
-/**
- * GET /api/auth/github/callback
- * Handles the OAuth callback from GitHub.
- */
-async function handleGitHubCallback(
-  request: Request,
-  env: Env,
-  session: SessionData,
-): Promise<{ response: Response; session: SessionData }> {
-  const url = new URL(request.url);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
-  const newSession: SessionData = { ...session };
-  delete newSession.oauthState;
-
-  if (!state || state !== session.oauthState) {
-    return { response: json({ error: 'Invalid state parameter' }, 403), session: newSession };
-  }
-  if (!code) {
-    return { response: json({ error: 'No authorization code provided' }, 400), session: newSession };
-  }
-
-  // Exchange code for access token
-  const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      client_id: env.GITHUB_CLIENT_ID,
-      client_secret: env.GITHUB_CLIENT_SECRET,
-      code,
-      redirect_uri: env.GITHUB_CALLBACK_URL,
-    }),
-  });
-
-  const tokenData = (await tokenResponse.json()) as { access_token?: string; error?: string };
-  if (!tokenData.access_token) {
-    return {
-      response: json({ error: tokenData.error ?? 'Failed to get access token' }, 400),
-      session: newSession,
-    };
-  }
-
-  // Fetch user profile
-  const userResponse = await fetch('https://api.github.com/user', {
-    headers: {
-      Authorization: `Bearer ${tokenData.access_token}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'commitstory-app',
-    },
-  });
-
-  if (!userResponse.ok) {
-    return { response: redirect('/login?error=profile_fetch_failed'), session: newSession };
-  }
-
-  const userData = (await userResponse.json()) as {
-    id: number;
-    login: string;
-    name: string | null;
-    email: string | null;
-    avatar_url: string;
-    html_url: string;
-    created_at: string;
-  };
-
-  newSession.accessToken = tokenData.access_token;
-  newSession.user = {
-    id: userData.id,
-    login: userData.login,
-    name: userData.name,
-    email: userData.email,
-    avatar_url: userData.avatar_url,
-    html_url: userData.html_url,
-    created_at: userData.created_at,
-  };
-
-  return { response: redirect('/dashboard'), session: newSession };
-}
-
-/**
- * POST /api/auth/logout
- * Clears the session cookie.
- */
-function handleLogout(): Response {
-  return json({ success: true });
-}
-
-/**
- * GET /api/auth/user
- * Returns the currently authenticated user, or 401 if not authenticated.
- */
-function handleAuthUser(session: SessionData): Response {
-  if (!session.user) return json({ error: 'Not authenticated' }, 401);
-  return json({ user: session.user });
-}
 
 /**
  * GET /api/github/user?username=...
@@ -1510,37 +1263,13 @@ const angularApp = new AngularAppEngine();
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const { pathname: path, protocol, hostname } = url;
+    const { pathname: path } = url;
     const method = request.method;
-    // Force insecure cookies on localhost to prevent browser from blocking them
-    const isSecure = protocol === 'https:' && !hostname.includes('localhost') && !hostname.includes('127.0.0.1');
-
-    // Validate required secrets at runtime (fail-fast)
-    if (!env.SESSION_SECRET) {
-      return new Response('SERVER_ERROR: SESSION_SECRET is not configured', { status: 500 });
-    }
-
-    const session = await getSession(request, env.SESSION_SECRET);
 
     let response: Response;
-    let newSession: SessionData | undefined;
-    let clearSession = false;
 
     // ── API Routing ────────────────────────────────────────────────────────────
-    if (path === '/api/auth/github' && method === 'GET') {
-      const result = await handleGitHubAuth(env, session);
-      response = result.response;
-      newSession = result.session;
-    } else if (path === '/api/auth/github/callback' && method === 'GET') {
-      const result = await handleGitHubCallback(request, env, session);
-      response = result.response;
-      newSession = result.session;
-    } else if (path === '/api/auth/logout' && method === 'POST') {
-      response = handleLogout();
-      clearSession = true;
-    } else if (path === '/api/auth/user' && method === 'GET') {
-      response = handleAuthUser(session);
-    } else if (path === '/api/github/user' && method === 'GET') {
+    if (path === '/api/github/user' && method === 'GET') {
       response = await handleGetUser(request, env);
     } else if (path === '/api/github/contributions' && method === 'GET') {
       response = await handleContributions(request, env);
@@ -1585,13 +1314,6 @@ export default {
         // Fall back to static asset
         response = await env.ASSETS.fetch(request);
       }
-    }
-
-    // Apply session cookie changes
-    if (clearSession) {
-      response = await applySession(response, null, env.SESSION_SECRET, isSecure);
-    } else if (newSession !== undefined) {
-      response = await applySession(response, newSession, env.SESSION_SECRET, isSecure);
     }
 
     return response;
