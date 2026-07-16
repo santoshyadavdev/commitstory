@@ -376,11 +376,11 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /** Max years per GraphQL query for contributions (lightweight – scalars only). */
-const CONTRIBUTIONS_CHUNK_SIZE = 5;
+const CONTRIBUTIONS_CHUNK_SIZE = 3;
 /** Max years per GraphQL query for repo contributions (heavy – nested nodes). */
-const REPO_CONTRIBUTIONS_CHUNK_SIZE = 3;
+const REPO_CONTRIBUTIONS_CHUNK_SIZE = 1;
 /** Max repositories to fetch per year in repo-contributions queries. */
-const MAX_REPOSITORIES_PER_YEAR = 20;
+const MAX_REPOSITORIES_PER_YEAR = 10;
 
 /**
  * POST /api/github/contributions-batch
