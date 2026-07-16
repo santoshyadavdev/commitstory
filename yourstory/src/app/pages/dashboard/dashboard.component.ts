@@ -11,7 +11,7 @@ import {
 } from '../../core/models/activity.models';
 import { GitHubService, GitHubUserProfile } from '../../core/services/github.service';
 import { ShareService, ShareResult } from '../../core/services/share.service';
-import { StoryService, StoryResponse, GENRES, LANGUAGES } from '../../core/services/story.service';
+import { StoryService, StoryResponse, RecentStory, GENRES, LANGUAGES } from '../../core/services/story.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ShareDropdownComponent } from '../../shared/components/share-dropdown/share-dropdown.component';
 import { SharePlatform } from '../../core/constants/share.constants';
@@ -257,6 +257,53 @@ import { SharePlatform } from '../../core/constants/share.constants';
                 </button>
               </div>
             }
+          }
+        }
+
+        <!-- Recent Stories -->
+        @if (viewMode() === 'story') {
+          @if (isLoadingRecentStories()) {
+            <div class="mt-8">
+              <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Recent Stories</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                @for (i of [1, 2, 3]; track i) {
+                  <div class="bg-white dark:bg-gray-900 rounded-xl p-5 shadow border border-gray-200 dark:border-gray-800 animate-pulse">
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-3"></div>
+                    <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+                    <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else if (recentStories().length > 0) {
+            <div class="mt-8">
+              <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Recent Stories</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                @for (story of recentStories(); track story.shareUrl) {
+                  <a
+                    [href]="story.shareUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="bg-white dark:bg-gray-900 rounded-xl p-5 shadow border border-gray-200 dark:border-gray-800 hover:border-coderabbit-orange/50 hover:shadow-md transition-all group block"
+                  >
+                    @if (story.imageUrl) {
+                      <img
+                        [src]="story.imageUrl"
+                        [alt]="story.title + ' artwork'"
+                        class="w-full h-32 object-cover rounded-lg mb-3"
+                        loading="lazy"
+                      />
+                    }
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="bg-coderabbit-orange/10 text-coderabbit-orange text-xs font-semibold px-2 py-0.5 rounded-full">{{ story.genre }}</span>
+                      <span class="text-xs text-gray-400 dark:text-gray-500">{{ story.username }}</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-coderabbit-orange transition-colors line-clamp-2">{{ story.title }}</h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ story.story }}</p>
+                  </a>
+                }
+              </div>
+            </div>
           }
         }
 
@@ -841,6 +888,8 @@ export class DashboardComponent {
   readonly storyImageUrl = signal<string | null>(null);
   readonly memberSinceYear = signal<number | null>(null);
   readonly shareNotification = signal<string | null>(null);
+  readonly recentStories = signal<RecentStory[]>([]);
+  readonly isLoadingRecentStories = signal(false);
 
   readonly totalInsightContributions = computed(() =>
     (this.insightsData() ?? []).reduce((sum, repo) => sum + repo.totalContributions, 0)
@@ -887,7 +936,15 @@ export class DashboardComponent {
   });
 
   constructor() {
-    // Nothing auto-loaded — user must enter a username first
+    this.loadRecentStories();
+  }
+
+  loadRecentStories(): void {
+    this.isLoadingRecentStories.set(true);
+    this.storyService.getRecentStories(5).pipe(
+      catchError(() => of({ stories: [] })),
+      finalize(() => this.isLoadingRecentStories.set(false)),
+    ).subscribe((res) => this.recentStories.set(res.stories));
   }
 
   onSearchUser(afterLoad?: () => void): void {
@@ -1112,6 +1169,7 @@ export class DashboardComponent {
           this.storyImageUrl.set(imageResult.imageUrl);
         }
         this.isGenerating.set(false);
+        this.loadRecentStories();
       },
       error: () => {
         this.isGeneratingImage.set(false);

@@ -1166,6 +1166,76 @@ async function handleGenerateStory(
 }
 
 /**
+ * GET /api/stories/recent
+ * Returns the most recent stories from KV (up to `limit`, default 5).
+ */
+async function handleRecentStories(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10) || 5, 1), 20);
+
+  try {
+    // List all story keys (excluding :imageKey metadata keys)
+    const listed = await env.STORY_KV.list();
+    const storyKeys = listed.keys.filter(
+      (k) => !k.name.endsWith(':imageKey'),
+    );
+
+    // Fetch all story values to sort by updatedAt
+    const stories: Array<{
+      username: string;
+      genre: string;
+      title: string;
+      story: string;
+      updatedAt?: string;
+      shareUrl: string;
+      imageUrl?: string;
+    }> = [];
+
+    const origin = url.origin;
+    for (const key of storyKeys) {
+      try {
+        const raw = await env.STORY_KV.get(key.name);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.title !== 'string' || typeof parsed.story !== 'string') continue;
+        const parts = key.name.split(':');
+        const handle = parts[0] || '';
+        const genre = parts.slice(1).join(':') || '';
+        if (!handle || !genre) continue;
+
+        const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${key.name}:imageKey`)) ?? undefined;
+        stories.push({
+          username: parsed.username || handle,
+          genre: parsed.genre || genre,
+          title: parsed.title,
+          story: parsed.story,
+          updatedAt: parsed.updatedAt,
+          shareUrl: `${origin}/story/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`,
+          ...(imageKey ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}` } : {}),
+        });
+      } catch {
+        // Skip entries that fail to parse
+      }
+    }
+
+    // Sort by updatedAt descending, then take limit
+    stories.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return json({ stories: stories.slice(0, limit) });
+  } catch (err) {
+    console.error('Recent stories error:', err);
+    return json({ error: 'Failed to fetch recent stories' }, 500);
+  }
+}
+
+/**
  * POST /api/stories/generate-image
  */
 async function handleGenerateStoryImage(
@@ -1480,6 +1550,8 @@ export default {
       response = await handleDiscussions(request, env);
     } else if (path === '/api/github/milestones' && method === 'POST') {
       response = await handleMilestones(request, env);
+    } else if (path === '/api/stories/recent' && method === 'GET') {
+      response = await handleRecentStories(request, env);
     } else if (path === '/api/stories/generate' && method === 'POST') {
       response = await handleGenerateStory(request, env);
     } else if (path === '/api/stories/generate-image' && method === 'POST') {

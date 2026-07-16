@@ -25,6 +25,20 @@ export interface StoryResponse {
   imageUrl?: string;
 }
 
+export interface RecentStory {
+  username: string;
+  genre: string;
+  title: string;
+  story: string;
+  updatedAt?: string;
+  shareUrl: string;
+  imageUrl?: string;
+}
+
+export interface RecentStoriesResponse {
+  stories: RecentStory[];
+}
+
 export interface ImageGenerationRequest {
   genre: string;
   storyTitle: string;
@@ -67,6 +81,13 @@ export class StoryService {
   ): Observable<StoryResponse> {
     const body: StoryRequest = { genre, language, activity, username, createdAt, topRepositories, forceRegenerate };
     return this.http.post<StoryResponse>('/api/stories/generate', body);
+  }
+
+  /**
+   * Fetches the most recently generated stories.
+   */
+  getRecentStories(limit = 5): Observable<RecentStoriesResponse> {
+    return this.http.get<RecentStoriesResponse>(`/api/stories/recent?limit=${limit}`);
   }
 
   /**
