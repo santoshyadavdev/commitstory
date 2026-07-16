@@ -155,21 +155,7 @@ async function handleContributions(request: Request, env: Env): Promise<Response
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
-  const queryWithPrivate = `
-    query($login: String!, $from: DateTime!, $to: DateTime!) {
-      user(login: $login) {
-        contributionsCollection(from: $from, to: $to) {
-          totalCommitContributions
-          totalIssueContributions
-          totalPullRequestContributions
-          totalPullRequestReviewContributions
-          restrictedContributionsCount
-        }
-      }
-    }
-  `;
-
-  const queryWithoutPrivate = `
+  const query = `
     query($login: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $login) {
         contributionsCollection(from: $from, to: $to) {
@@ -182,8 +168,8 @@ async function handleContributions(request: Request, env: Env): Promise<Response
     }
   `;
 
-  const requestGraphQL = (query: string) =>
-    fetch('https://api.github.com/graphql', {
+  try {
+    const response = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -193,44 +179,21 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       body: JSON.stringify({ query, variables: { login, from, to } }),
     });
 
-  try {
-    type ContributionsCollection = {
-      totalCommitContributions: number;
-      totalIssueContributions: number;
-      totalPullRequestContributions: number;
-      totalPullRequestReviewContributions: number;
-      restrictedContributionsCount?: number;
-    };
-
-    type GraphQLResponse = {
-      data?: { user?: { contributionsCollection?: ContributionsCollection } };
-      errors?: Array<{ message: string; extensions?: { saml_failure?: boolean } }>;
-    };
-
-    const response = await requestGraphQL(queryWithPrivate);
     if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
 
-    const data = (await response.json()) as GraphQLResponse;
+    const data = (await response.json()) as {
+      data?: { user?: { contributionsCollection?: {
+        totalCommitContributions: number;
+        totalIssueContributions: number;
+        totalPullRequestContributions: number;
+        totalPullRequestReviewContributions: number;
+      } } };
+      errors?: Array<{ message: string }>;
+    };
 
-    let c = data.data?.user?.contributionsCollection;
-    let privateBlocked = false;
+    if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
 
-    if (data.errors?.length) {
-      const hasSamlError = data.errors.some((e) => {
-        const msg = e.message?.toLowerCase() ?? '';
-        return e.extensions?.saml_failure === true || msg.includes('saml') || msg.includes('organization');
-      });
-
-      if (!hasSamlError) return json({ error: data.errors[0].message }, 400);
-
-      // Retry without restrictedContributionsCount for SAML-enforced orgs
-      privateBlocked = true;
-      const fallback = await requestGraphQL(queryWithoutPrivate);
-      if (!fallback.ok) return json({ error: 'GitHub API error' }, fallback.status);
-      const fallbackData = (await fallback.json()) as GraphQLResponse;
-      if (fallbackData.errors?.length) return json({ error: fallbackData.errors[0].message }, 400);
-      c = fallbackData.data?.user?.contributionsCollection ?? c;
-    }
+    const c = data.data?.user?.contributionsCollection;
 
     return json({
       year,
@@ -238,8 +201,7 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: privateBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
-      ...(privateBlocked ? { privateContributionsBlocked: true } : {}),
+      privateContributions: 0,
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
@@ -408,12 +370,11 @@ async function handleContributionsBatch(
     totalIssueContributions: number;
     totalPullRequestContributions: number;
     totalPullRequestReviewContributions: number;
-    restrictedContributionsCount?: number;
   };
 
   type GraphQLResponse = {
     data?: { user?: Record<string, ContributionsCollection> };
-    errors?: Array<{ message: string; extensions?: { saml_failure?: boolean } }>;
+    errors?: Array<{ message: string }>;
   };
 
   const contribFields = `
@@ -421,25 +382,15 @@ async function handleContributionsBatch(
     totalIssueContributions
     totalPullRequestContributions
     totalPullRequestReviewContributions
-    restrictedContributionsCount
-  `;
-
-  const contribFieldsNoPrivate = `
-    totalCommitContributions
-    totalIssueContributions
-    totalPullRequestContributions
-    totalPullRequestReviewContributions
   `;
 
   const chunks = chunkArray(years, CONTRIBUTIONS_CHUNK_SIZE);
-  const allResults: { year: number; commits: number; issues: number; pullRequests: number; reviews: number; privateContributions: number; privateContributionsBlocked?: boolean }[] = [];
-  let privateBlocked = false;
+  const allResults: { year: number; commits: number; issues: number; pullRequests: number; reviews: number; privateContributions: number }[] = [];
 
   try {
     for (const chunk of chunks) {
-      const fields = privateBlocked ? contribFieldsNoPrivate : contribFields;
       const yearFragments = chunk.map(
-        (y) => `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { ${fields} }`
+        (y) => `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { ${contribFields} }`
       ).join('\n          ');
 
       const query = `
@@ -463,56 +414,7 @@ async function handleContributionsBatch(
 
       const data = (await response.json()) as GraphQLResponse;
 
-      if (data.errors?.length) {
-        const hasSamlError = data.errors.some((e) => {
-          const msg = e.message?.toLowerCase() ?? '';
-          return e.extensions?.saml_failure === true || msg.includes('saml') || msg.includes('organization');
-        });
-
-        if (!hasSamlError) return json({ error: data.errors[0].message }, 400);
-
-        // Retry this chunk without restrictedContributionsCount
-        privateBlocked = true;
-        const fallbackFragments = chunk.map(
-          (y) => `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { ${contribFieldsNoPrivate} }`
-        ).join('\n          ');
-
-        const fallbackQuery = `
-          query($login: String!) {
-            user(login: $login) { ${fallbackFragments} }
-          }
-        `;
-
-        const fallbackResponse = await fetch('https://api.github.com/graphql', {
-          method: 'POST',
-          headers: {
-            Authorization: `bearer ${token}`,
-            'Content-Type': 'application/json',
-            'User-Agent': 'commitstory-app',
-          },
-          body: JSON.stringify({ query: fallbackQuery, variables: { login } }),
-        });
-
-        if (!fallbackResponse.ok) return json({ error: 'GitHub API error' }, fallbackResponse.status);
-
-        const fallbackData = (await fallbackResponse.json()) as GraphQLResponse;
-        if (fallbackData.errors?.length) return json({ error: fallbackData.errors[0].message }, 400);
-
-        const user = fallbackData.data?.user ?? {};
-        for (const y of chunk) {
-          const c = user[`y${y}`];
-          allResults.push({
-            year: y,
-            commits: c?.totalCommitContributions ?? 0,
-            issues: c?.totalIssueContributions ?? 0,
-            pullRequests: c?.totalPullRequestContributions ?? 0,
-            reviews: c?.totalPullRequestReviewContributions ?? 0,
-            privateContributions: 0,
-            privateContributionsBlocked: true,
-          });
-        }
-        continue;
-      }
+      if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
 
       const user = data.data?.user ?? {};
       for (const y of chunk) {
@@ -523,8 +425,7 @@ async function handleContributionsBatch(
           issues: c?.totalIssueContributions ?? 0,
           pullRequests: c?.totalPullRequestContributions ?? 0,
           reviews: c?.totalPullRequestReviewContributions ?? 0,
-          privateContributions: privateBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
-          ...(privateBlocked ? { privateContributionsBlocked: true } : {}),
+          privateContributions: 0,
         });
       }
     }
