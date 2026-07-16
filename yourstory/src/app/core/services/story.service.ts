@@ -37,6 +37,7 @@ export interface RecentStory {
 
 export interface RecentStoriesResponse {
   stories: RecentStory[];
+  hasMore?: boolean;
 }
 
 export interface ImageGenerationRequest {
@@ -86,8 +87,8 @@ export class StoryService {
   /**
    * Fetches the most recently generated stories.
    */
-  getRecentStories(limit = 5): Observable<RecentStoriesResponse> {
-    return this.http.get<RecentStoriesResponse>(`/api/stories/recent?limit=${limit}`);
+  getRecentStories(limit = 10, offset = 0): Observable<RecentStoriesResponse> {
+    return this.http.get<RecentStoriesResponse>(`/api/stories/recent?limit=${limit}&offset=${offset}`);
   }
 
   /**

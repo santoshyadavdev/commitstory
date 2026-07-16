@@ -937,8 +937,10 @@ async function handleRecentStories(
   env: Env,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '5', 10);
-  const limit = Number.isNaN(requestedLimit) ? 5 : Math.min(Math.max(requestedLimit, 1), 20);
+  const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '10', 10);
+  const limit = Number.isNaN(requestedLimit) ? 10 : Math.min(Math.max(requestedLimit, 1), 50);
+  const requestedOffset = Number.parseInt(url.searchParams.get('offset') ?? '0', 10);
+  const offset = Number.isNaN(requestedOffset) ? 0 : Math.max(requestedOffset, 0);
 
   try {
     // Read the pre-built recent stories index
@@ -974,8 +976,9 @@ async function handleRecentStories(
       }
 
       // If the index already has enough entries, return early
-      if (indexedStories.length >= limit) {
-        return json({ stories: indexedStories });
+      if (indexedStories.length >= offset + limit) {
+        const page = indexedStories.slice(offset, offset + limit);
+        return json({ stories: page, hasMore: indexedStories.length > offset + limit });
       }
     }
 
@@ -1030,7 +1033,8 @@ async function handleRecentStories(
 
     // Merge: indexed entries first (already sorted), then legacy entries
     const allStories = [...indexedStories, ...legacyStories];
-    return json({ stories: allStories.slice(0, limit) });
+    const page = allStories.slice(offset, offset + limit);
+    return json({ stories: page, hasMore: allStories.length > offset + limit });
   } catch (err) {
     console.error('Recent stories error:', err);
     return json({ error: 'Failed to fetch recent stories' }, 500);
