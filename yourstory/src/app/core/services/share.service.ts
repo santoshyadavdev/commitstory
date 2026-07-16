@@ -1,5 +1,4 @@
-import { Injectable, inject } from '@angular/core';
-import { AuthService } from '../auth/auth.service';
+import { Injectable } from '@angular/core';
 import {
   APP_URL,
   CODERABBIT_HANDLE,
@@ -13,7 +12,6 @@ export type ShareResult = 'clipboard' | 'url-only';
 
 @Injectable({ providedIn: 'root' })
 export class ShareService {
-  private readonly authService = inject(AuthService);
 
   /**
    * Capture `element` as a PNG, copy it to the clipboard, then open the
@@ -51,7 +49,7 @@ export class ShareService {
    * Returns a fully-constructed share URL for the given platform.
    */
   getShareUrl(platform: SharePlatform, type: ShareType, genre?: string, storyUrl?: string): string {
-    const username = this.authService.user()?.login ?? '';
+    const username = '';
 
     switch (platform) {
       case 'twitter':

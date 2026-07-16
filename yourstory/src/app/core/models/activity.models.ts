@@ -1,13 +1,3 @@
-export interface UserProfile {
-  id: number;
-  login: string;
-  name: string | null;
-  email: string | null;
-  avatar_url: string;
-  html_url: string;
-  created_at?: string;
-}
-
 export interface RepositoryContribution {
   name: string;
   nameWithOwner: string;

@@ -23,9 +23,3 @@ bucket_name = "commitstory-images"
 # Add secrets via the Cloudflare dashboard or:
 #   wrangler secret put GOOGLE_AI_API_KEY
 #   wrangler secret put GITHUB_TOKEN        ← required: GitHub PAT with read:user scope
-#
-# Legacy OAuth secrets (no longer required):
-#   wrangler secret put SESSION_SECRET
-#   wrangler secret put GITHUB_CLIENT_ID
-#   wrangler secret put GITHUB_CLIENT_SECRET
-#   wrangler secret put GITHUB_CALLBACK_URL
