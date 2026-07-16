@@ -14,9 +14,7 @@ binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "STORY_KV"
-# Create your own KV namespace: wrangler kv namespace create STORY_KV
-# Then paste the id here.
-id = "<YOUR_KV_NAMESPACE_ID>"
+id = "a689f233e0954afab18f1ea71b40deb0"
 
 [[r2_buckets]]
 binding = "STORY_IMAGES"
