@@ -303,6 +303,27 @@ import { SharePlatform } from '../../core/constants/share.constants';
                   </a>
                 }
               </div>
+              @if (hasMoreStories()) {
+                <div class="mt-6 flex justify-center">
+                  <button
+                    (click)="loadMoreStories()"
+                    [disabled]="isLoadingMoreStories()"
+                    class="px-6 py-2.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-coderabbit-orange/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    @if (isLoadingMoreStories()) {
+                      <span class="inline-flex items-center gap-2">
+                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Loading...
+                      </span>
+                    } @else {
+                      Load More
+                    }
+                  </button>
+                </div>
+              }
             </div>
           }
         }
@@ -890,7 +911,10 @@ export class DashboardComponent {
   readonly shareNotification = signal<string | null>(null);
   readonly recentStories = signal<RecentStory[]>([]);
   readonly isLoadingRecentStories = signal(false);
+  readonly isLoadingMoreStories = signal(false);
+  readonly hasMoreStories = signal(false);
   private recentStoriesRequestId = 0;
+  private readonly STORIES_PAGE_SIZE = 10;
 
   readonly totalInsightContributions = computed(() =>
     (this.insightsData() ?? []).reduce((sum, repo) => sum + repo.totalContributions, 0)
@@ -943,7 +967,8 @@ export class DashboardComponent {
   loadRecentStories(): void {
     const requestId = ++this.recentStoriesRequestId;
     this.isLoadingRecentStories.set(true);
-    this.storyService.getRecentStories(5).pipe(
+    this.hasMoreStories.set(false);
+    this.storyService.getRecentStories(this.STORIES_PAGE_SIZE).pipe(
       catchError(() => EMPTY),
       finalize(() => {
         if (requestId === this.recentStoriesRequestId) {
@@ -953,7 +978,20 @@ export class DashboardComponent {
     ).subscribe((res) => {
       if (requestId === this.recentStoriesRequestId) {
         this.recentStories.set(res.stories);
+        this.hasMoreStories.set(res.hasMore ?? false);
       }
+    });
+  }
+
+  loadMoreStories(): void {
+    const currentStories = this.recentStories();
+    this.isLoadingMoreStories.set(true);
+    this.storyService.getRecentStories(this.STORIES_PAGE_SIZE, currentStories.length).pipe(
+      catchError(() => EMPTY),
+      finalize(() => this.isLoadingMoreStories.set(false)),
+    ).subscribe((res) => {
+      this.recentStories.set([...currentStories, ...res.stories]);
+      this.hasMoreStories.set(res.hasMore ?? false);
     });
   }
 

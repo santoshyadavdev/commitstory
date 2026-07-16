@@ -937,35 +937,58 @@ async function handleRecentStories(
   env: Env,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '5', 10);
-  const limit = Number.isNaN(requestedLimit) ? 5 : Math.min(Math.max(requestedLimit, 1), 20);
+  const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '10', 10);
+  const limit = Number.isNaN(requestedLimit) ? 10 : Math.min(Math.max(requestedLimit, 1), 50);
+  const requestedOffset = Number.parseInt(url.searchParams.get('offset') ?? '0', 10);
+  const offset = Number.isNaN(requestedOffset) ? 0 : Math.max(requestedOffset, 0);
 
   try {
     // Read the pre-built recent stories index
     const indexRaw = await env.STORY_KV.get(RECENT_STORIES_INDEX_KEY);
     const origin = url.origin;
 
+    // Start with indexed entries if available
+    const indexedStories: Array<{
+      username: string;
+      genre: string;
+      title: string;
+      story: string;
+      updatedAt?: string;
+      shareUrl: string;
+      imageUrl?: string;
+    }> = [];
+    // Track indexed story keys to avoid duplicates when merging with legacy scan
+    const indexedKeys = new Set<string>();
+
     if (indexRaw) {
       const index: RecentStoryEntry[] = JSON.parse(indexRaw);
-      const stories = index.slice(0, limit).map((entry) => ({
-        username: entry.username,
-        genre: entry.genre,
-        title: entry.title,
-        story: entry.story,
-        updatedAt: entry.updatedAt,
-        shareUrl: `${origin}/story/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}`,
-        ...(entry.hasImage ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}` } : {}),
-      }));
-      return json({ stories });
+      for (const entry of index.slice(0, limit)) {
+        indexedStories.push({
+          username: entry.username,
+          genre: entry.genre,
+          title: entry.title,
+          story: entry.story,
+          updatedAt: entry.updatedAt,
+          shareUrl: `${origin}/story/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}`,
+          ...(entry.hasImage ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}` } : {}),
+        });
+        indexedKeys.add(`${entry.handle}:${entry.genre}`);
+      }
+
+      // If the index already has enough entries, return early
+      if (indexedStories.length >= offset + limit) {
+        const page = indexedStories.slice(offset, offset + limit);
+        return json({ stories: page, hasMore: indexedStories.length > offset + limit });
+      }
     }
 
-    // Legacy fallback: scan KV keys for namespaces without an index (pre-deployment stories)
+    // Legacy fallback: scan KV keys to fill remaining slots (pre-deployment stories)
     const listed = await env.STORY_KV.list();
     const storyKeys = listed.keys.filter(
       (k) => !k.name.endsWith(':imageKey') && k.name !== RECENT_STORIES_INDEX_KEY,
     );
 
-    const stories: Array<{
+    const legacyStories: Array<{
       username: string;
       genre: string;
       title: string;
@@ -976,6 +999,7 @@ async function handleRecentStories(
     }> = [];
 
     for (const key of storyKeys) {
+      if (indexedKeys.has(key.name)) continue;
       try {
         const raw = await env.STORY_KV.get(key.name);
         if (!raw) continue;
@@ -987,7 +1011,7 @@ async function handleRecentStories(
         if (!handle || !genre) continue;
 
         const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${key.name}:imageKey`)) ?? undefined;
-        stories.push({
+        legacyStories.push({
           username: parsed.username || handle,
           genre: parsed.genre || genre,
           title: parsed.title,
@@ -1001,13 +1025,16 @@ async function handleRecentStories(
       }
     }
 
-    stories.sort((a, b) => {
+    legacyStories.sort((a, b) => {
       const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return dateB - dateA;
     });
 
-    return json({ stories: stories.slice(0, limit) });
+    // Merge: indexed entries first (already sorted), then legacy entries
+    const allStories = [...indexedStories, ...legacyStories];
+    const page = allStories.slice(offset, offset + limit);
+    return json({ stories: page, hasMore: allStories.length > offset + limit });
   } catch (err) {
     console.error('Recent stories error:', err);
     return json({ error: 'Failed to fetch recent stories' }, 500);
