@@ -42,6 +42,7 @@ cd commitstory
 npm install
 
 # Copy environment files
+cp .env.example .env
 cp .dev.vars.example .dev.vars
 ```
 
@@ -70,7 +71,7 @@ The app will be available at `http://localhost:8787`.
 
 ## Project Structure
 
-```
+```text
 ├── yourstory/              # Angular application (frontend + SSR)
 │   ├── src/
 │   │   ├── app/            # Angular components, services, routing
@@ -117,8 +118,8 @@ npm run cf:deploy
 Secrets must be set via the Cloudflare dashboard or CLI:
 
 ```bash
-wrangler secret put GOOGLE_AI_API_KEY
-wrangler secret put GITHUB_TOKEN
+npx wrangler secret put GOOGLE_AI_API_KEY
+npx wrangler secret put GITHUB_TOKEN
 ```
 
 ## Contributing

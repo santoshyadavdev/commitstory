@@ -90,7 +90,7 @@ npx nx graph
 
 4. Commit with a clear message following [Conventional Commits](https://www.conventionalcommits.org/):
 
-   ```
+   ```text
    feat: add new story genre option
    fix: correct timeline date parsing
    docs: update setup instructions
