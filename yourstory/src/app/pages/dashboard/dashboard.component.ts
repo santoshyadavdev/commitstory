@@ -1,7 +1,7 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { catchError, finalize, of, switchMap } from 'rxjs';
+import { catchError, EMPTY, finalize, of, switchMap } from 'rxjs';
 import {
   ActivitySummary,
   MilestoneEvent,
@@ -944,7 +944,7 @@ export class DashboardComponent {
     const requestId = ++this.recentStoriesRequestId;
     this.isLoadingRecentStories.set(true);
     this.storyService.getRecentStories(5).pipe(
-      catchError(() => of({ stories: [] })),
+      catchError(() => EMPTY),
       finalize(() => {
         if (requestId === this.recentStoriesRequestId) {
           this.isLoadingRecentStories.set(false);

@@ -941,25 +941,73 @@ async function handleRecentStories(
   const limit = Number.isNaN(requestedLimit) ? 5 : Math.min(Math.max(requestedLimit, 1), 20);
 
   try {
-    // Read the pre-built recent stories index instead of scanning all KV keys
+    // Read the pre-built recent stories index
     const indexRaw = await env.STORY_KV.get(RECENT_STORIES_INDEX_KEY);
-    if (!indexRaw) {
-      return json({ stories: [] });
+    const origin = url.origin;
+
+    if (indexRaw) {
+      const index: RecentStoryEntry[] = JSON.parse(indexRaw);
+      const stories = index.slice(0, limit).map((entry) => ({
+        username: entry.username,
+        genre: entry.genre,
+        title: entry.title,
+        story: entry.story,
+        updatedAt: entry.updatedAt,
+        shareUrl: `${origin}/story/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}`,
+        ...(entry.hasImage ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}` } : {}),
+      }));
+      return json({ stories });
     }
 
-    const index: RecentStoryEntry[] = JSON.parse(indexRaw);
-    const origin = url.origin;
-    const stories = index.slice(0, limit).map((entry) => ({
-      username: entry.username,
-      genre: entry.genre,
-      title: entry.title,
-      story: entry.story,
-      updatedAt: entry.updatedAt,
-      shareUrl: `${origin}/story/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}`,
-      ...(entry.hasImage ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}` } : {}),
-    }));
+    // Legacy fallback: scan KV keys for namespaces without an index (pre-deployment stories)
+    const listed = await env.STORY_KV.list();
+    const storyKeys = listed.keys.filter(
+      (k) => !k.name.endsWith(':imageKey') && k.name !== RECENT_STORIES_INDEX_KEY,
+    );
 
-    return json({ stories });
+    const stories: Array<{
+      username: string;
+      genre: string;
+      title: string;
+      story: string;
+      updatedAt?: string;
+      shareUrl: string;
+      imageUrl?: string;
+    }> = [];
+
+    for (const key of storyKeys) {
+      try {
+        const raw = await env.STORY_KV.get(key.name);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.title !== 'string' || typeof parsed.story !== 'string') continue;
+        const parts = key.name.split(':');
+        const handle = parts[0] || '';
+        const genre = parts.slice(1).join(':') || '';
+        if (!handle || !genre) continue;
+
+        const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${key.name}:imageKey`)) ?? undefined;
+        stories.push({
+          username: parsed.username || handle,
+          genre: parsed.genre || genre,
+          title: parsed.title,
+          story: parsed.story,
+          updatedAt: parsed.updatedAt,
+          shareUrl: `${origin}/story/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`,
+          ...(imageKey ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}` } : {}),
+        });
+      } catch {
+        // Skip entries that fail to parse
+      }
+    }
+
+    stories.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return json({ stories: stories.slice(0, limit) });
   } catch (err) {
     console.error('Recent stories error:', err);
     return json({ error: 'Failed to fetch recent stories' }, 500);
