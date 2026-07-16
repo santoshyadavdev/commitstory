@@ -899,6 +899,16 @@ async function handleGenerateStory(
         await env.STORY_KV.put(storyKey, storyData);
         const origin = new URL(request.url).origin;
         shareUrl = `${origin}/story/${encodeURIComponent(username)}/${encodeURIComponent(genre as string)}`;
+        // Update the recent stories index
+        await updateRecentStoriesIndex(env, {
+          handle: username,
+          username,
+          genre: genre as string,
+          title: parsedTitle,
+          story: parsedStory,
+          updatedAt: new Date().toISOString(),
+          hasImage: false,
+        });
       } catch (err) {
         console.error('Failed to persist story to KV:', err);
       }
@@ -927,61 +937,29 @@ async function handleRecentStories(
   env: Env,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '5', 10) || 5, 1), 20);
+  const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '5', 10);
+  const limit = Number.isNaN(requestedLimit) ? 5 : Math.min(Math.max(requestedLimit, 1), 20);
 
   try {
-    // List all story keys (excluding :imageKey metadata keys)
-    const listed = await env.STORY_KV.list();
-    const storyKeys = listed.keys.filter(
-      (k) => !k.name.endsWith(':imageKey'),
-    );
-
-    // Fetch all story values to sort by updatedAt
-    const stories: Array<{
-      username: string;
-      genre: string;
-      title: string;
-      story: string;
-      updatedAt?: string;
-      shareUrl: string;
-      imageUrl?: string;
-    }> = [];
-
-    const origin = url.origin;
-    for (const key of storyKeys) {
-      try {
-        const raw = await env.STORY_KV.get(key.name);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed.title !== 'string' || typeof parsed.story !== 'string') continue;
-        const parts = key.name.split(':');
-        const handle = parts[0] || '';
-        const genre = parts.slice(1).join(':') || '';
-        if (!handle || !genre) continue;
-
-        const imageKey = parsed.imageKey ?? (await env.STORY_KV.get(`${key.name}:imageKey`)) ?? undefined;
-        stories.push({
-          username: parsed.username || handle,
-          genre: parsed.genre || genre,
-          title: parsed.title,
-          story: parsed.story,
-          updatedAt: parsed.updatedAt,
-          shareUrl: `${origin}/story/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}`,
-          ...(imageKey ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(handle)}/${encodeURIComponent(genre)}` } : {}),
-        });
-      } catch {
-        // Skip entries that fail to parse
-      }
+    // Read the pre-built recent stories index instead of scanning all KV keys
+    const indexRaw = await env.STORY_KV.get(RECENT_STORIES_INDEX_KEY);
+    if (!indexRaw) {
+      return json({ stories: [] });
     }
 
-    // Sort by updatedAt descending, then take limit
-    stories.sort((a, b) => {
-      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    const index: RecentStoryEntry[] = JSON.parse(indexRaw);
+    const origin = url.origin;
+    const stories = index.slice(0, limit).map((entry) => ({
+      username: entry.username,
+      genre: entry.genre,
+      title: entry.title,
+      story: entry.story,
+      updatedAt: entry.updatedAt,
+      shareUrl: `${origin}/story/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}`,
+      ...(entry.hasImage ? { imageUrl: `${origin}/api/stories/image/${encodeURIComponent(entry.handle)}/${encodeURIComponent(entry.genre)}` } : {}),
+    }));
 
-    return json({ stories: stories.slice(0, limit) });
+    return json({ stories });
   } catch (err) {
     console.error('Recent stories error:', err);
     return json({ error: 'Failed to fetch recent stories' }, 500);
@@ -1080,6 +1058,23 @@ async function handleGenerateStoryImage(
         // Store imageKey separately to avoid read-modify-write race with story generation
         const imageMetaKey = `${buildStoryKey(username, genre as string)}:imageKey`;
         await env.STORY_KV.put(imageMetaKey, imageKey);
+
+        // Mark hasImage in the recent stories index
+        try {
+          const idxRaw = await env.STORY_KV.get(RECENT_STORIES_INDEX_KEY);
+          if (idxRaw) {
+            const idx: RecentStoryEntry[] = JSON.parse(idxRaw);
+            const match = idx.find(
+              (e) => e.handle === username && e.genre === (genre as string),
+            );
+            if (match && !match.hasImage) {
+              match.hasImage = true;
+              await env.STORY_KV.put(RECENT_STORIES_INDEX_KEY, JSON.stringify(idx));
+            }
+          }
+        } catch {
+          // Non-critical: index update for image flag
+        }
       } catch (uploadErr) {
         console.error('Failed to decode/upload image to R2:', uploadErr);
       }
@@ -1123,6 +1118,46 @@ async function handleServeStoryImage(
 /** Validates that a handle/genre contain only safe characters (no slashes, colons, or control chars). */
 function isValidStoryParam(value: string): boolean {
   return /^[a-zA-Z0-9_\-.]+$/.test(value);
+}
+
+/** KV key that holds the recent stories index (max 50 entries). */
+const RECENT_STORIES_INDEX_KEY = '__recent_stories_index__';
+const RECENT_STORIES_MAX_ENTRIES = 50;
+
+interface RecentStoryEntry {
+  handle: string;
+  username: string;
+  genre: string;
+  title: string;
+  story: string;
+  updatedAt: string;
+  hasImage: boolean;
+}
+
+/**
+ * Update the recent stories index when a story is created or updated.
+ * Keeps the index sorted by updatedAt desc, capped at RECENT_STORIES_MAX_ENTRIES.
+ */
+async function updateRecentStoriesIndex(
+  env: Env,
+  entry: RecentStoryEntry,
+): Promise<void> {
+  try {
+    const raw = await env.STORY_KV.get(RECENT_STORIES_INDEX_KEY);
+    let index: RecentStoryEntry[] = raw ? JSON.parse(raw) : [];
+    // Remove existing entry for same handle+genre
+    index = index.filter(
+      (e) => !(e.handle === entry.handle && e.genre === entry.genre),
+    );
+    // Prepend new entry and cap
+    index.unshift(entry);
+    if (index.length > RECENT_STORIES_MAX_ENTRIES) {
+      index = index.slice(0, RECENT_STORIES_MAX_ENTRIES);
+    }
+    await env.STORY_KV.put(RECENT_STORIES_INDEX_KEY, JSON.stringify(index));
+  } catch (err) {
+    console.error('Failed to update recent stories index:', err);
+  }
 }
 
 /** Builds a collision-safe KV key from handle and genre. */

@@ -890,6 +890,7 @@ export class DashboardComponent {
   readonly shareNotification = signal<string | null>(null);
   readonly recentStories = signal<RecentStory[]>([]);
   readonly isLoadingRecentStories = signal(false);
+  private recentStoriesRequestId = 0;
 
   readonly totalInsightContributions = computed(() =>
     (this.insightsData() ?? []).reduce((sum, repo) => sum + repo.totalContributions, 0)
@@ -940,11 +941,20 @@ export class DashboardComponent {
   }
 
   loadRecentStories(): void {
+    const requestId = ++this.recentStoriesRequestId;
     this.isLoadingRecentStories.set(true);
     this.storyService.getRecentStories(5).pipe(
       catchError(() => of({ stories: [] })),
-      finalize(() => this.isLoadingRecentStories.set(false)),
-    ).subscribe((res) => this.recentStories.set(res.stories));
+      finalize(() => {
+        if (requestId === this.recentStoriesRequestId) {
+          this.isLoadingRecentStories.set(false);
+        }
+      }),
+    ).subscribe((res) => {
+      if (requestId === this.recentStoriesRequestId) {
+        this.recentStories.set(res.stories);
+      }
+    });
   }
 
   onSearchUser(afterLoad?: () => void): void {
