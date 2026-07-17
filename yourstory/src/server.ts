@@ -337,8 +337,8 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-/** Max years per GraphQL query for contributions (lightweight – scalars only). */
-const CONTRIBUTIONS_CHUNK_SIZE = 3;
+/** Max years per GraphQL query for contributions. */
+const CONTRIBUTIONS_CHUNK_SIZE = 1;
 /** Max years per GraphQL query for repo contributions (heavy – nested nodes). */
 const REPO_CONTRIBUTIONS_CHUNK_SIZE = 1;
 /** Max repositories to fetch per year in repo-contributions queries. */
