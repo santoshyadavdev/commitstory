@@ -46,6 +46,9 @@ interface RepositoryContributionsBatchResponse {
   years: RepositoryContributionsResponse[];
 }
 
+/** Maximum number of years to fetch to stay within GitHub API limits. */
+const MAX_YEARS = 7;
+
 @Injectable({ providedIn: 'root' })
 export class GitHubService {
   private readonly http = inject(HttpClient);
@@ -159,7 +162,7 @@ export class GitHubService {
 
     let startYear: number;
     if (createdAt) {
-      startYear = new Date(createdAt).getFullYear();
+      startYear = Math.max(new Date(createdAt).getFullYear(), currentYear - MAX_YEARS + 1);
     } else {
       startYear = currentYear - 3;
     }
@@ -223,7 +226,7 @@ export class GitHubService {
 
     let startYear: number;
     if (createdAt) {
-      startYear = new Date(createdAt).getFullYear();
+      startYear = Math.max(new Date(createdAt).getFullYear(), currentYear - MAX_YEARS + 1);
     } else {
       startYear = currentYear - 3;
     }
