@@ -47,7 +47,7 @@ interface RepositoryContributionsBatchResponse {
 }
 
 /** Maximum number of years to fetch to stay within GitHub API limits. */
-const MAX_YEARS = 7;
+const MAX_YEARS = 5;
 
 @Injectable({ providedIn: 'root' })
 export class GitHubService {
