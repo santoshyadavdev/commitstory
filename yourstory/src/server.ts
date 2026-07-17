@@ -387,6 +387,8 @@ async function handleContributionsBatch(
   const chunks = chunkArray(years, CONTRIBUTIONS_CHUNK_SIZE);
   const allResults: { year: number; commits: number; issues: number; pullRequests: number; reviews: number; privateContributions: number }[] = [];
 
+  const failedYears: number[] = [];
+
   try {
     for (const chunk of chunks) {
       const yearFragments = chunk.map(
@@ -410,11 +412,21 @@ async function handleContributionsBatch(
         body: JSON.stringify({ query, variables: { login } }),
       });
 
-      if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
+      if (!response.ok) {
+        // Treat entire chunk as failed but continue with other chunks
+        console.warn(`GitHub API returned ${response.status} for contributions chunk [${chunk.join(',')}]`);
+        failedYears.push(...chunk);
+        continue;
+      }
 
       const data = (await response.json()) as GraphQLResponse;
 
-      if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
+      if (data.errors?.length) {
+        // Resource limits or other errors — skip this chunk, continue
+        console.warn(`GitHub GraphQL error for contributions chunk [${chunk.join(',')}]: ${data.errors[0].message}`);
+        failedYears.push(...chunk);
+        continue;
+      }
 
       const user = data.data?.user ?? {};
       for (const y of chunk) {
@@ -430,7 +442,7 @@ async function handleContributionsBatch(
       }
     }
 
-    return json({ years: allResults });
+    return json({ years: allResults, failedYears: failedYears.length > 0 ? failedYears : undefined });
   } catch (err) {
     console.error('GitHub contributions-batch error:', err);
     return json({ error: 'Failed to fetch contributions' }, 500);
@@ -491,6 +503,7 @@ async function handleRepositoryContributionsBatch(
 
   const chunks = chunkArray(years, REPO_CONTRIBUTIONS_CHUNK_SIZE);
   const allResults: { year: number; topRepositories: RepoEntry[] }[] = [];
+  const failedYears: number[] = [];
 
   try {
     for (const chunk of chunks) {
@@ -515,14 +528,22 @@ async function handleRepositoryContributionsBatch(
         body: JSON.stringify({ query, variables: { login } }),
       });
 
-      if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
+      if (!response.ok) {
+        console.warn(`GitHub API returned ${response.status} for repo-contributions chunk [${chunk.join(',')}]`);
+        failedYears.push(...chunk);
+        continue;
+      }
 
       const data = (await response.json()) as {
         data?: { user?: Record<string, YearCollection> };
         errors?: { message: string }[];
       };
 
-      if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
+      if (data.errors?.length) {
+        console.warn(`GitHub GraphQL error for repo-contributions chunk [${chunk.join(',')}]: ${data.errors[0].message}`);
+        failedYears.push(...chunk);
+        continue;
+      }
 
       const user = data.data?.user ?? {};
 
@@ -564,7 +585,7 @@ async function handleRepositoryContributionsBatch(
       }
     }
 
-    return json({ years: allResults });
+    return json({ years: allResults, failedYears: failedYears.length > 0 ? failedYears : undefined });
   } catch (err) {
     console.error('GitHub repository-contributions-batch error:', err);
     return json({ error: 'Failed to fetch repository contributions' }, 500);

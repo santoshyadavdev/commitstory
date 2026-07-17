@@ -30,6 +30,7 @@ interface ContributionsResponse {
 
 interface ContributionsBatchResponse {
   years: ContributionsResponse[];
+  failedYears?: number[];
 }
 
 interface DiscussionsResponse {
@@ -44,6 +45,7 @@ interface RepositoryContributionsResponse {
 
 interface RepositoryContributionsBatchResponse {
   years: RepositoryContributionsResponse[];
+  failedYears?: number[];
 }
 
 /** Maximum number of years to fetch to stay within GitHub API limits. */
