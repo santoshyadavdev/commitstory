@@ -28,6 +28,11 @@ interface ContributionsResponse {
   privateContributions: number;
 }
 
+interface ContributionsBatchResponse {
+  years: ContributionsResponse[];
+  failedYears?: number[];
+}
+
 interface DiscussionsResponse {
   lifetimeDiscussions: number;
   lifetimeDiscussionComments: number;
@@ -37,6 +42,14 @@ interface RepositoryContributionsResponse {
   year: number;
   topRepositories: RepositoryContribution[];
 }
+
+interface RepositoryContributionsBatchResponse {
+  years: RepositoryContributionsResponse[];
+  failedYears?: number[];
+}
+
+/** Maximum number of years to fetch to stay within GitHub API limits. */
+const MAX_YEARS = 5;
 
 @Injectable({ providedIn: 'root' })
 export class GitHubService {
@@ -75,6 +88,26 @@ export class GitHubService {
       '/api/github/repository-contributions',
       { params }
     );
+  }
+
+  /**
+   * Fetches contributions for multiple years in a single API call using GraphQL aliases.
+   */
+  getContributionsBatch(username: string, years: number[]): Observable<ContributionsBatchResponse> {
+    return this.http.post<ContributionsBatchResponse>('/api/github/contributions-batch', {
+      username,
+      years,
+    });
+  }
+
+  /**
+   * Fetches repository contributions for multiple years in a single API call.
+   */
+  getRepositoryContributionsBatch(username: string, years: number[]): Observable<RepositoryContributionsBatchResponse> {
+    return this.http.post<RepositoryContributionsBatchResponse>('/api/github/repository-contributions-batch', {
+      username,
+      years,
+    });
   }
 
   /**
@@ -118,7 +151,8 @@ export class GitHubService {
 
   /**
    * Fetches contributions from the user's account creation year to the current year,
-   * capped at a maximum of 10 years, then aggregates the numeric fields by summing them.
+   * then aggregates the numeric fields by summing them.
+   * Uses a single batched GraphQL call instead of per-year requests.
    * Discussion counts are included once — they are already lifetime totals.
    *
    * @param username - GitHub username to fetch data for.
@@ -130,9 +164,8 @@ export class GitHubService {
 
     let startYear: number;
     if (createdAt) {
-      startYear = new Date(createdAt).getFullYear();
+      startYear = Math.max(new Date(createdAt).getFullYear(), currentYear - MAX_YEARS + 1);
     } else {
-      // Fallback: last 4 years (original behaviour)
       startYear = currentYear - 3;
     }
 
@@ -142,11 +175,14 @@ export class GitHubService {
     }
 
     return forkJoin({
-      contributions: forkJoin(years.map((year) => this.getContributions(username, year))),
+      contributionsBatch: this.getContributionsBatch(username, years),
       discussions: this.getDiscussions(username),
-      repoContributions: forkJoin(years.map((year) => this.getRepositoryContributions(username, year))),
+      repoContributionsBatch: this.getRepositoryContributionsBatch(username, years),
     }).pipe(
-      map(({ contributions, discussions, repoContributions }) => {
+      map(({ contributionsBatch, discussions, repoContributionsBatch }) => {
+        const contributions = contributionsBatch.years;
+        const repoContributions = repoContributionsBatch.years;
+
         // Merge repository contributions across years, deduplicating by nameWithOwner
         const repoMap = new Map<string, RepositoryContribution>();
         for (const yearData of repoContributions) {
@@ -179,8 +215,9 @@ export class GitHubService {
   }
 
   /**
-   * Fetches repository contribution insights from account creation year to current year,
-   * capped at a maximum of 10 years, and merges per-repository activity across years.
+   * Fetches repository contribution insights from account creation year to current year
+   * and merges per-repository activity across years.
+   * Uses a single batched GraphQL call instead of per-year requests.
    *
    * @param username - GitHub username to fetch data for.
    * @param createdAt - ISO 8601 date string of the GitHub account creation date.
@@ -191,7 +228,7 @@ export class GitHubService {
 
     let startYear: number;
     if (createdAt) {
-      startYear = new Date(createdAt).getFullYear();
+      startYear = Math.max(new Date(createdAt).getFullYear(), currentYear - MAX_YEARS + 1);
     } else {
       startYear = currentYear - 3;
     }
@@ -201,11 +238,11 @@ export class GitHubService {
       years.push(y);
     }
 
-    return forkJoin(years.map((year) => this.getRepositoryContributions(username, year))).pipe(
-      map((yearlyResults) => {
+    return this.getRepositoryContributionsBatch(username, years).pipe(
+      map((batchResponse) => {
         const repoMap = new Map<string, RepositoryInsight>();
 
-        for (const yearData of yearlyResults) {
+        for (const yearData of batchResponse.years) {
           const year = yearData.year;
           for (const repo of yearData.topRepositories) {
             const yearlyContribution: YearlyRepoContribution = {

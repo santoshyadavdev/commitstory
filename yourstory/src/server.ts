@@ -155,21 +155,7 @@ async function handleContributions(request: Request, env: Env): Promise<Response
   const from = `${year}-01-01T00:00:00Z`;
   const to = `${year}-12-31T23:59:59Z`;
 
-  const queryWithPrivate = `
-    query($login: String!, $from: DateTime!, $to: DateTime!) {
-      user(login: $login) {
-        contributionsCollection(from: $from, to: $to) {
-          totalCommitContributions
-          totalIssueContributions
-          totalPullRequestContributions
-          totalPullRequestReviewContributions
-          restrictedContributionsCount
-        }
-      }
-    }
-  `;
-
-  const queryWithoutPrivate = `
+  const query = `
     query($login: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $login) {
         contributionsCollection(from: $from, to: $to) {
@@ -182,8 +168,8 @@ async function handleContributions(request: Request, env: Env): Promise<Response
     }
   `;
 
-  const requestGraphQL = (query: string) =>
-    fetch('https://api.github.com/graphql', {
+  try {
+    const response = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -193,44 +179,21 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       body: JSON.stringify({ query, variables: { login, from, to } }),
     });
 
-  try {
-    type ContributionsCollection = {
-      totalCommitContributions: number;
-      totalIssueContributions: number;
-      totalPullRequestContributions: number;
-      totalPullRequestReviewContributions: number;
-      restrictedContributionsCount?: number;
-    };
-
-    type GraphQLResponse = {
-      data?: { user?: { contributionsCollection?: ContributionsCollection } };
-      errors?: Array<{ message: string; extensions?: { saml_failure?: boolean } }>;
-    };
-
-    const response = await requestGraphQL(queryWithPrivate);
     if (!response.ok) return json({ error: 'GitHub API error' }, response.status);
 
-    const data = (await response.json()) as GraphQLResponse;
+    const data = (await response.json()) as {
+      data?: { user?: { contributionsCollection?: {
+        totalCommitContributions: number;
+        totalIssueContributions: number;
+        totalPullRequestContributions: number;
+        totalPullRequestReviewContributions: number;
+      } } };
+      errors?: Array<{ message: string }>;
+    };
 
-    let c = data.data?.user?.contributionsCollection;
-    let privateBlocked = false;
+    if (data.errors?.length) return json({ error: data.errors[0].message }, 400);
 
-    if (data.errors?.length) {
-      const hasSamlError = data.errors.some((e) => {
-        const msg = e.message?.toLowerCase() ?? '';
-        return e.extensions?.saml_failure === true || msg.includes('saml') || msg.includes('organization');
-      });
-
-      if (!hasSamlError) return json({ error: data.errors[0].message }, 400);
-
-      // Retry without restrictedContributionsCount for SAML-enforced orgs
-      privateBlocked = true;
-      const fallback = await requestGraphQL(queryWithoutPrivate);
-      if (!fallback.ok) return json({ error: 'GitHub API error' }, fallback.status);
-      const fallbackData = (await fallback.json()) as GraphQLResponse;
-      if (fallbackData.errors?.length) return json({ error: fallbackData.errors[0].message }, 400);
-      c = fallbackData.data?.user?.contributionsCollection ?? c;
-    }
+    const c = data.data?.user?.contributionsCollection;
 
     return json({
       year,
@@ -238,8 +201,7 @@ async function handleContributions(request: Request, env: Env): Promise<Response
       issues: c?.totalIssueContributions ?? 0,
       pullRequests: c?.totalPullRequestContributions ?? 0,
       reviews: c?.totalPullRequestReviewContributions ?? 0,
-      privateContributions: privateBlocked ? 0 : (c?.restrictedContributionsCount ?? 0),
-      ...(privateBlocked ? { privateContributionsBlocked: true } : {}),
+      privateContributions: 0,
     });
   } catch (err) {
     console.error('GitHub contributions error:', err);
@@ -360,6 +322,272 @@ async function handleRepositoryContributions(
     return json({ year, topRepositories });
   } catch (err) {
     console.error('GitHub repository-contributions error:', err);
+    return json({ error: 'Failed to fetch repository contributions' }, 500);
+  }
+}
+
+// ─── Shared helpers for batched GitHub endpoints ──────────────────────────────
+
+/** Split an array into chunks of at most `size` elements. */
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+/** Max years per GraphQL query for contributions. */
+const CONTRIBUTIONS_CHUNK_SIZE = 1;
+/** Max years per GraphQL query for repo contributions (heavy – nested nodes). */
+const REPO_CONTRIBUTIONS_CHUNK_SIZE = 1;
+/** Max repositories to fetch per year in repo-contributions queries. */
+const MAX_REPOSITORIES_PER_YEAR = 10;
+
+/**
+ * POST /api/github/contributions-batch
+ * Body: { username: string, years: number[] }
+ *
+ * Fetches contributions for all requested years using GraphQL field aliases.
+ * Years are chunked to stay within GitHub's query complexity limits.
+ */
+async function handleContributionsBatch(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const body = (await request.json()) as { username?: string; years?: number[] };
+  const login = body.username ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
+
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  const years = body.years ?? [new Date().getFullYear()];
+  if (years.length === 0) return json({ error: 'years array is empty' }, 400);
+
+  type ContributionsCollection = {
+    totalCommitContributions: number;
+    totalIssueContributions: number;
+    totalPullRequestContributions: number;
+    totalPullRequestReviewContributions: number;
+  };
+
+  type GraphQLResponse = {
+    data?: { user?: Record<string, ContributionsCollection> };
+    errors?: Array<{ message: string }>;
+  };
+
+  const contribFields = `
+    totalCommitContributions
+    totalIssueContributions
+    totalPullRequestContributions
+    totalPullRequestReviewContributions
+  `;
+
+  const chunks = chunkArray(years, CONTRIBUTIONS_CHUNK_SIZE);
+  const allResults: { year: number; commits: number; issues: number; pullRequests: number; reviews: number; privateContributions: number }[] = [];
+
+  const failedYears: number[] = [];
+
+  try {
+    for (const chunk of chunks) {
+      const yearFragments = chunk.map(
+        (y) => `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { ${contribFields} }`
+      ).join('\n          ');
+
+      const query = `
+        query($login: String!) {
+          rateLimit { cost remaining }
+          user(login: $login) { ${yearFragments} }
+        }
+      `;
+
+      const response = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'commitstory-app',
+        },
+        body: JSON.stringify({ query, variables: { login } }),
+      });
+
+      if (!response.ok) {
+        // Treat entire chunk as failed but continue with other chunks
+        console.warn(`GitHub API returned ${response.status} for contributions chunk [${chunk.join(',')}]`);
+        failedYears.push(...chunk);
+        continue;
+      }
+
+      const data = (await response.json()) as GraphQLResponse;
+
+      if (data.errors?.length) {
+        // Resource limits or other errors — skip this chunk, continue
+        console.warn(`GitHub GraphQL error for contributions chunk [${chunk.join(',')}]: ${data.errors[0].message}`);
+        failedYears.push(...chunk);
+        continue;
+      }
+
+      const user = data.data?.user ?? {};
+      for (const y of chunk) {
+        const c = user[`y${y}`];
+        allResults.push({
+          year: y,
+          commits: c?.totalCommitContributions ?? 0,
+          issues: c?.totalIssueContributions ?? 0,
+          pullRequests: c?.totalPullRequestContributions ?? 0,
+          reviews: c?.totalPullRequestReviewContributions ?? 0,
+          privateContributions: 0,
+        });
+      }
+    }
+
+    return json({ years: allResults, failedYears: failedYears.length > 0 ? failedYears : undefined });
+  } catch (err) {
+    console.error('GitHub contributions-batch error:', err);
+    return json({ error: 'Failed to fetch contributions' }, 500);
+  }
+}
+
+/**
+ * POST /api/github/repository-contributions-batch
+ * Body: { username: string, years: number[] }
+ *
+ * Fetches repository contributions for all requested years using GraphQL
+ * field aliases. Years are chunked (3 at a time) to stay within node limits.
+ */
+async function handleRepositoryContributionsBatch(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const body = (await request.json()) as { username?: string; years?: number[] };
+  const login = body.username ?? '';
+  if (!login) return json({ error: 'username is required' }, 400);
+
+  const token = env.GITHUB_TOKEN;
+  if (!token) return json({ error: 'GITHUB_TOKEN is not configured' }, 503);
+
+  const years = body.years ?? [new Date().getFullYear()];
+  if (years.length === 0) return json({ error: 'years array is empty' }, 400);
+
+  type RepoContribNode = {
+    contributions: { totalCount: number };
+    repository: { name: string; nameWithOwner: string; url: string; stargazerCount: number };
+  };
+
+  type YearCollection = {
+    commitContributionsByRepository: RepoContribNode[];
+    pullRequestContributionsByRepository: RepoContribNode[];
+  };
+
+  interface RepoEntry {
+    name: string;
+    nameWithOwner: string;
+    url: string;
+    stargazerCount: number;
+    commits: number;
+    pullRequests: number;
+    totalContributions: number;
+  }
+
+  const repoFields = `
+    commitContributionsByRepository(maxRepositories: ${MAX_REPOSITORIES_PER_YEAR}) {
+      contributions { totalCount }
+      repository { name nameWithOwner url stargazerCount }
+    }
+    pullRequestContributionsByRepository(maxRepositories: ${MAX_REPOSITORIES_PER_YEAR}) {
+      contributions { totalCount }
+      repository { name nameWithOwner url stargazerCount }
+    }
+  `;
+
+  const chunks = chunkArray(years, REPO_CONTRIBUTIONS_CHUNK_SIZE);
+  const allResults: { year: number; topRepositories: RepoEntry[] }[] = [];
+  const failedYears: number[] = [];
+
+  try {
+    for (const chunk of chunks) {
+      const yearFragments = chunk.map(
+        (y) => `y${y}: contributionsCollection(from: "${y}-01-01T00:00:00Z", to: "${y}-12-31T23:59:59Z") { ${repoFields} }`
+      ).join('\n          ');
+
+      const query = `
+        query($login: String!) {
+          rateLimit { cost remaining }
+          user(login: $login) { ${yearFragments} }
+        }
+      `;
+
+      const response = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'commitstory-app',
+        },
+        body: JSON.stringify({ query, variables: { login } }),
+      });
+
+      if (!response.ok) {
+        console.warn(`GitHub API returned ${response.status} for repo-contributions chunk [${chunk.join(',')}]`);
+        failedYears.push(...chunk);
+        continue;
+      }
+
+      const data = (await response.json()) as {
+        data?: { user?: Record<string, YearCollection> };
+        errors?: { message: string }[];
+      };
+
+      if (data.errors?.length) {
+        console.warn(`GitHub GraphQL error for repo-contributions chunk [${chunk.join(',')}]: ${data.errors[0].message}`);
+        failedYears.push(...chunk);
+        continue;
+      }
+
+      const user = data.data?.user ?? {};
+
+      for (const y of chunk) {
+        const collection = user[`y${y}`];
+        const commitsByRepo = collection?.commitContributionsByRepository ?? [];
+        const prsByRepo = collection?.pullRequestContributionsByRepository ?? [];
+
+        const repoMap = new Map<string, RepoEntry>();
+
+        for (const node of commitsByRepo) {
+          const { name, nameWithOwner, url, stargazerCount } = node.repository;
+          const commits = node.contributions.totalCount;
+          const existing = repoMap.get(nameWithOwner);
+          if (existing) {
+            existing.commits += commits;
+            existing.totalContributions += commits;
+          } else {
+            repoMap.set(nameWithOwner, { name, nameWithOwner, url, stargazerCount, commits, pullRequests: 0, totalContributions: commits });
+          }
+        }
+
+        for (const node of prsByRepo) {
+          const { name, nameWithOwner, url, stargazerCount } = node.repository;
+          const prs = node.contributions.totalCount;
+          const existing = repoMap.get(nameWithOwner);
+          if (existing) {
+            existing.pullRequests += prs;
+            existing.totalContributions += prs;
+          } else {
+            repoMap.set(nameWithOwner, { name, nameWithOwner, url, stargazerCount, commits: 0, pullRequests: prs, totalContributions: prs });
+          }
+        }
+
+        const topRepositories = Array.from(repoMap.values())
+          .sort((a, b) => b.totalContributions - a.totalContributions);
+
+        allResults.push({ year: y, topRepositories });
+      }
+    }
+
+    return json({ years: allResults, failedYears: failedYears.length > 0 ? failedYears : undefined });
+  } catch (err) {
+    console.error('GitHub repository-contributions-batch error:', err);
     return json({ error: 'Failed to fetch repository contributions' }, 500);
   }
 }
@@ -1385,6 +1613,10 @@ export default {
       response = await handleContributions(request, env);
     } else if (path === '/api/github/repository-contributions' && method === 'GET') {
       response = await handleRepositoryContributions(request, env);
+    } else if (path === '/api/github/contributions-batch' && method === 'POST') {
+      response = await handleContributionsBatch(request, env);
+    } else if (path === '/api/github/repository-contributions-batch' && method === 'POST') {
+      response = await handleRepositoryContributionsBatch(request, env);
     } else if (path === '/api/github/discussions' && method === 'GET') {
       response = await handleDiscussions(request, env);
     } else if (path === '/api/github/milestones' && method === 'POST') {
