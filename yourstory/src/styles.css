@@ -1,36 +1,51 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "hack-font/build/web/hack-subset.css";
+@import "@coderabbitai/carrot-ui/src/scales.css";
+@import "@coderabbitai/carrot-ui/src/theme.css";
 
-/* You can add global styles to this file, and also import other style files */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
-@layer base {
-  :root {
-    --color-bg: #F6F6F1;
-    --color-bg-dark: #171717;
-  }
+@theme {
+  /* App-specific animations (preserved from old tailwind.config.js) */
+  --animate-blob: blob 7s infinite ease-in-out;
+  --animate-fade-in: fadeIn 0.8s ease-out both;
+  --animate-fade-in-slow: fadeIn 0.8s ease-out 0.3s both;
+  --animate-fade-in-slower: fadeIn 0.8s ease-out 0.6s both;
+  --animate-glow-pulse: glowPulse 2s ease-in-out infinite;
+  --animate-gradient-shift: gradientShift 6s ease infinite;
+}
 
-  html {
-    @apply bg-coderabbit-cream;
-  }
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
 
-  html.dark {
-    @apply bg-coderabbit-neutral;
-  }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
-  body {
-    @apply bg-coderabbit-cream text-gray-900;
-  }
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
 
-  html.dark body {
-    @apply bg-coderabbit-neutral text-white;
-  }
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Body base styles using carrot-ui tokens */
+body {
+  @apply bg-cui-base-1 font-cui-sans text-cui-base text-cui-primary;
 }
 
 /* Horizontal timeline scrollbar */
 .timeline-scroll {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.gray.300') transparent;
+  scrollbar-color: var(--border-color-cui-neutral) transparent;
 }
 
 .timeline-scroll::-webkit-scrollbar {
@@ -42,16 +57,8 @@
 }
 
 .timeline-scroll::-webkit-scrollbar-thumb {
-  background-color: theme('colors.gray.300');
+  background-color: var(--border-color-cui-neutral);
   border-radius: 3px;
-}
-
-html.dark .timeline-scroll {
-  scrollbar-color: theme('colors.gray.700') transparent;
-}
-
-html.dark .timeline-scroll::-webkit-scrollbar-thumb {
-  background-color: theme('colors.gray.700');
 }
 
 .line-clamp-2 {
