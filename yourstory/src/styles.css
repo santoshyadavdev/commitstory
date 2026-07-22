@@ -3,6 +3,8 @@
 @import "@coderabbitai/carrot-ui/scales";
 @import "@coderabbitai/carrot-ui/theme";
 
+@source "./**/*.{html,ts}";
+
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 @theme {
