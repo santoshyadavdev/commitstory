@@ -14,9 +14,9 @@
 
 | File | Action | Responsibility |
 |---|---|---|
-| `package.json` | Modify | Add font dependencies, move `@coderabbitai/carrot-ui` to dependencies, add `@tailwindcss/vite` |
+| `package.json` | Modify | Add `@fontsource-variable/geist`; add `@tailwindcss/postcss` (devDep); `@coderabbitai/carrot-ui` stays in dependencies |
 | `yourstory/tailwind.config.js` | Delete | No longer needed with TW v4 CSS-first config |
-| `yourstory/vite.config.mts` | Modify | Add `@tailwindcss/vite` plugin |
+| `yourstory/vite.config.mts` | Modify | Remove `@tailwindcss/vite` (PostCSS handles Tailwind) |
 | `yourstory/src/styles.css` | Rewrite | TW v4 imports, carrot-ui token imports, dark mode variant, custom animations |
 | `yourstory/src/index.html` | Modify | Add `data-theme="light"` to `<html>` tag |
 | `yourstory/src/app/core/services/theme.service.ts` | Modify | Switch from class toggle to `data-theme` attribute |
@@ -40,8 +40,7 @@
 - [ ] **Step 1: Install Tailwind v4, fonts, and Vite plugin**
 
 ```bash
-cd /Users/santosh/.copilot/copilot-worktrees/commitstory/santoshyadavdev-glowing-enigma
-npm install tailwindcss@4 @tailwindcss/vite @fontsource-variable/geist hack-font --save
+npm install tailwindcss@4 @tailwindcss/postcss @fontsource-variable/geist --save
 ```
 
 This upgrades `tailwindcss` from v3 to v4, adds the Vite plugin, and installs the font packages. The `autoprefixer` and `postcss` devDependencies can remain — they're harmless and may be used elsewhere.
@@ -107,9 +106,8 @@ git commit -m "chore: install Tailwind v4 + carrot-ui fonts, remove TW v3 config
 ```css
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
-@import "hack-font/build/web/hack-subset.css";
-@import "@coderabbitai/carrot-ui/src/scales.css";
-@import "@coderabbitai/carrot-ui/src/theme.css";
+@import "@coderabbitai/carrot-ui/scales";
+@import "@coderabbitai/carrot-ui/theme";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
@@ -270,7 +268,7 @@ export class ThemeService {
 npx nx test yourstory
 ```
 
-Expected: all existing tests pass (ThemeService isn't directly tested, but other tests should not break).
+Expected: build succeeds. Note: a pre-existing `window.matchMedia is not a function` jsdom failure exists (not caused by this migration). Targeted validation: verify ThemeService still toggles `data-theme` attribute correctly and no new test regressions are introduced.
 
 - [ ] **Step 4: Commit**
 
@@ -461,31 +459,31 @@ This is the largest change. The template is ~830 lines with repeated patterns. A
 Apply these search-and-replace operations across the template string. Each pair shows old → new:
 
 **Page container (line 24):**
-```
+```text
 Old: class="min-h-screen bg-coderabbit-cream dark:bg-coderabbit-neutral text-gray-900 dark:text-white p-6"
 New: class="min-h-screen bg-cui-base-1 text-cui-primary p-6"
 ```
 
 **Toast notification (line 29):**
-```
+```text
 Old: class="fixed bottom-5 right-5 z-50 flex items-center gap-3 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium px-5 py-3 rounded-xl shadow-2xl border border-gray-700 dark:border-gray-300 animate-fade-in"
 New: class="fixed bottom-5 right-5 z-50 flex items-center gap-3 bg-cui-inverse text-cui-inverse text-sm font-medium px-5 py-3 rounded-xl shadow-2xl border border-cui-neutral animate-fade-in"
 ```
 
 **Subtitle text (lines 41–43):**
-```
+```text
 Old: class="text-gray-600 dark:text-gray-400 mb-8"
 New: class="text-cui-secondary mb-8"
 ```
 
 **Tab group container (line 45):**
-```
+```text
 Old: class="inline-flex bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-1 mb-8"
 New: class="inline-flex bg-cui-base-2 border border-cui-neutral rounded-lg p-1 mb-8"
 ```
 
 **Tab buttons — active state (lines 48–51, 57–60, 67–70):**
-```
+```text
 Old: [class.bg-coderabbit-orange]="viewMode() === '...'"
      [class.text-white]="viewMode() === '...'"
      [class.text-gray-600]="viewMode() !== '...'"
@@ -498,67 +496,67 @@ New: [class.bg-cui-accent]="viewMode() === '...'"
 (Remove the `[class.dark:text-gray-300]` lines entirely — the semantic token handles it.)
 
 **Text inputs (lines 82, 333–334, 673–674):**
-```
+```text
 Old: class="flex-1 min-w-[180px] bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange placeholder-gray-400 dark:placeholder-gray-500"
 New: class="flex-1 min-w-[180px] bg-cui-base-2 text-cui-primary border border-cui-neutral rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cui-focus placeholder-cui-tertiary"
 ```
 
 **Select inputs (lines 96–98, 111–113):**
-```
+```text
 Old: class="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coderabbit-orange"
 New: class="bg-cui-base-2 text-cui-primary border border-cui-neutral rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cui-focus"
 ```
 
 **Labels (lines 94, 109):**
-```
+```text
 Old: class="text-xs text-gray-600 dark:text-gray-400"
 New: class="text-xs text-cui-secondary"
 ```
 
 **Primary action buttons (lines 123–126, 345–348, 685–688):**
-```
+```text
 Old: class="flex items-center gap-2 bg-coderabbit-orange hover:bg-coderabbit-orange/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
 New: class="flex items-center gap-2 bg-cui-accent hover:bg-cui-accent-strong disabled:opacity-50 disabled:cursor-not-allowed text-cui-accent-on text-sm font-medium px-4 py-2 rounded-lg transition-colors"
 ```
 
 **Spinner border on primary buttons (lines 129, 351, 660, 691):**
-```
+```text
 Old: class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"
 New: class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-cui-accent-on"
 ```
 
 **Error text (lines 137, 358–359, 698–699):**
-```
+```text
 Old: class="mb-4 text-sm text-red-600 dark:text-red-400"
 New: class="mb-4 text-sm text-cui-danger"
 ```
 
 **User profile row (lines 140, 362, 702):**
-```
+```text
 Old: class="mb-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
 New: class="mb-6 flex items-center gap-2 text-sm text-cui-secondary"
 ```
 
 **Profile avatar border (lines 141, 363, 703):**
-```
+```text
 Old: class="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600"
 New: class="w-6 h-6 rounded-full border border-cui-neutral"
 ```
 
 **Profile name (lines 142, 364, 704):**
-```
+```text
 Old: class="font-medium text-gray-900 dark:text-white"
 New: class="font-medium text-cui-primary"
 ```
 
 **Profile link (lines 144, 366, 706):**
-```
+```text
 Old: class="text-coderabbit-orange hover:underline"
 New: class="text-cui-accent hover:underline"
 ```
 
 **Cards — white backgrounds (lines 149, 376, 716):**
-```
+```text
 Old: class="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg mb-4"
      (or with "... border border-gray-200 dark:border-gray-800")
 New: class="bg-cui-base-2 rounded-2xl p-6 shadow-lg mb-4"
@@ -566,109 +564,109 @@ New: class="bg-cui-base-2 rounded-2xl p-6 shadow-lg mb-4"
 ```
 
 **Stat tiles (lines 156–193 — repeated pattern):**
-```
+```text
 Old: class="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center"
 New: class="bg-cui-neutral-subtle rounded-xl p-4 text-center"
 ```
 
 **Stat tile values:**
-```
+```text
 Old: class="text-3xl font-bold text-gray-900 dark:text-white"
 New: class="text-3xl font-bold text-cui-primary"
 ```
 
 **Stat tile labels:**
-```
+```text
 Old: class="text-xs text-gray-500 dark:text-gray-400 mt-1"
 New: class="text-xs text-cui-secondary mt-1"
 ```
 
 **Accent-colored stat values (lines 184, 190):**
-```
+```text
 Old: class="text-3xl font-bold text-coderabbit-orange"
 New: class="text-3xl font-bold text-cui-accent"
 ```
 
 **Accent border on stat tile (line 189):**
-```
+```text
 Old: class="bg-gray-100 dark:bg-gray-800 border border-coderabbit-orange/40 rounded-xl p-4 text-center"
 New: class="bg-cui-neutral-subtle border border-cui-accent/40 rounded-xl p-4 text-center"
 ```
 
 **Dividers (line 197):**
-```
+```text
 Old: class="border-t border-gray-200 dark:border-gray-800 pt-5"
 New: class="border-t border-cui-neutral pt-5"
 ```
 
 **Genre badge (line 199):**
-```
+```text
 Old: class="bg-coderabbit-orange text-white text-xs font-semibold px-2.5 py-0.5 rounded-full"
 New: class="bg-cui-accent text-cui-accent-on text-xs font-semibold px-2.5 py-0.5 rounded-full"
 ```
 
 **Subtitle text variants (line 202):**
-```
+```text
 Old: class="text-gray-500 dark:text-gray-500 text-xs"
 New: class="text-cui-tertiary text-xs"
 ```
 
 **Image placeholder (line 207):**
-```
+```text
 Old: class="mb-4 h-52 w-full animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
 New: class="mb-4 h-52 w-full animate-pulse rounded-xl bg-cui-neutral-subtle border border-cui-neutral"
 ```
 
 **Image border (line 213):**
-```
+```text
 Old: class="mb-4 w-full h-auto object-contain rounded-xl border border-gray-200 dark:border-gray-700"
 New: class="mb-4 w-full h-auto object-contain rounded-xl border border-cui-neutral"
 ```
 
 **Story title (line 218):**
-```
+```text
 Old: class="text-2xl font-bold text-gray-900 dark:text-white mb-3"
 New: class="text-2xl font-bold text-cui-primary mb-3"
 ```
 
 **Story body text (line 219):**
-```
+```text
 Old: class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line"
 New: class="text-cui-secondary text-sm leading-relaxed whitespace-pre-line"
 ```
 
 **"Produced by CodeRabbit" (line 220):**
-```
+```text
 Old: class="text-gray-500 dark:text-gray-500 text-xs mt-4"
 New: class="text-cui-tertiary text-xs mt-4"
 ```
 
 **Cache banner (line 227):**
-```
+```text
 Old: class="mb-3 flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 text-sm text-amber-700 dark:text-amber-300"
 New: class="mb-3 flex items-center gap-2 rounded-lg border border-cui-warn bg-cui-warn-subtle px-4 py-2 text-sm text-cui-warn"
 ```
 
 **Secondary action buttons (lines 239, 247, 655, 730):**
-```
+```text
 Old: class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 ... text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors"
 New: class="flex items-center gap-2 bg-cui-base-2 hover:bg-cui-subtle ... text-cui-primary text-sm font-medium px-4 py-2 rounded-lg border border-cui-neutral transition-colors"
 ```
 
 **Recent stories header (lines 267, 280):**
-```
+```text
 Old: class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300"
 New: class="text-lg font-semibold mb-4 text-cui-secondary"
 ```
 
 **Skeleton loading cards (line 270):**
-```
+```text
 Old: class="bg-white dark:bg-gray-900 rounded-xl p-5 shadow border border-gray-200 dark:border-gray-800 animate-pulse"
 New: class="bg-cui-base-2 rounded-xl p-5 shadow border border-cui-neutral animate-pulse"
 ```
 
 **Skeleton bars (lines 271–273):**
-```
+```text
 Old: class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-3"
 New: class="h-4 bg-cui-neutral-subtle rounded w-3/4 mb-3"
 ```
@@ -676,112 +674,112 @@ New: class="h-4 bg-cui-neutral-subtle rounded w-3/4 mb-3"
 (Apply similar for the other skeleton bars.)
 
 **Story card links (line 287):**
-```
+```text
 Old: class="bg-white dark:bg-gray-900 rounded-xl p-5 shadow border border-gray-200 dark:border-gray-800 hover:border-coderabbit-orange/50 hover:shadow-md transition-all group block"
 New: class="bg-cui-base-2 rounded-xl p-5 shadow border border-cui-neutral hover:border-cui-accent/50 hover:shadow-md transition-all group block"
 ```
 
 **Story card genre badge (line 298):**
-```
+```text
 Old: class="bg-coderabbit-orange/10 text-coderabbit-orange text-xs font-semibold px-2 py-0.5 rounded-full"
 New: class="bg-cui-accent-subtle text-cui-accent text-xs font-semibold px-2 py-0.5 rounded-full"
 ```
 
 **Story card username (line 299):**
-```
+```text
 Old: class="text-xs text-gray-400 dark:text-gray-500"
 New: class="text-xs text-cui-tertiary"
 ```
 
 **Story card title (line 301):**
-```
+```text
 Old: class="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-coderabbit-orange transition-colors line-clamp-2"
 New: class="text-sm font-semibold text-cui-primary group-hover:text-cui-accent transition-colors line-clamp-2"
 ```
 
 **Story card description (line 302):**
-```
+```text
 Old: class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2"
 New: class="text-xs text-cui-secondary mt-1 line-clamp-2"
 ```
 
 **Load More button (line 311):**
-```
+```text
 Old: class="px-6 py-2.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-coderabbit-orange/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 New: class="px-6 py-2.5 text-sm font-medium rounded-lg border border-cui-neutral text-cui-secondary bg-cui-base-2 hover:bg-cui-subtle hover:border-cui-accent/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 ```
 
 **Error panels (lines 370, 710):**
-```
+```text
 Old: class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200"
 New: class="mb-4 rounded-lg border border-cui-danger bg-cui-danger-subtle px-4 py-3 text-sm text-cui-danger"
 ```
 
 **Timeline header gradient icon (line 380):**
-```
+```text
 Old: class="w-10 h-10 rounded-xl bg-gradient-to-br from-coderabbit-orange to-amber-500 flex items-center justify-center shadow-md"
 New: class="w-10 h-10 rounded-xl bg-cui-accent flex items-center justify-center shadow-md"
 ```
 
 **Timeline header icon text (line 381):**
-```
+```text
 Old: class="text-white text-lg"
 New: class="text-cui-accent-on text-lg"
 ```
 
 **Timeline section headers (lines 384, 385, 723, 724):**
-```
+```text
 Old: class="text-xl font-bold text-gray-900 dark:text-white"
 New: class="text-xl font-bold text-cui-primary"
 ```
 
-```
+```text
 Old: class="text-xs text-gray-500 dark:text-gray-400"
 New: class="text-xs text-cui-secondary"
 ```
 
 **Filter label (line 395):**
-```
+```text
 Old: class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
 New: class="text-xs font-semibold uppercase tracking-wider text-cui-tertiary"
 ```
 
 **Filter "All" link (line 398):**
-```
+```text
 Old: class="text-xs font-medium text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
 New: class="text-xs font-medium text-cui-accent hover:text-cui-accent/70 transition-colors"
 ```
 
 **Filter "None" link (line 402):**
-```
+```text
 Old: class="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
 New: class="text-xs font-medium text-cui-tertiary hover:text-cui-secondary transition-colors"
 ```
 
 **Timeline stats row (lines 483–503):**
-```
+```text
 Old: class="relative overflow-hidden bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800"
 New: class="relative overflow-hidden bg-cui-neutral-subtle rounded-xl p-4 text-center border border-cui-neutral"
 ```
 
-```
+```text
 Old: class="text-2xl font-bold text-gray-900 dark:text-white mt-1"
 New: class="text-2xl font-bold text-cui-primary mt-1"
 ```
 
-```
+```text
 Old: class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5"
 New: class="text-xs font-medium text-cui-secondary mt-0.5"
 ```
 
 **Timeline spine line (line 510):**
-```
+```text
 Old: class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"
 New: class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-cui-neutral to-transparent"
 ```
 
 **Timeline year badge (line 521):**
-```
+```text
 Old: class="text-[10px] font-bold uppercase tracking-widest text-white bg-gray-400 dark:bg-gray-600 px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap"
 New: class="text-[10px] font-bold uppercase tracking-widest text-cui-inverse bg-cui-inverse px-2.5 py-1 rounded-full shadow-sm whitespace-nowrap"
 ```
@@ -789,110 +787,110 @@ New: class="text-[10px] font-bold uppercase tracking-widest text-cui-inverse bg-
 Note: This is a special case where we want contrasting text on a contrasting background. Use the inverse tokens.
 
 **Timeline connectors (lines 529, 533):**
-```
+```text
 Old: class="absolute top-1/2 ... bg-gray-200 dark:bg-gray-700"
 New: class="absolute top-1/2 ... bg-cui-neutral"
 ```
 
 **Timeline spine dot (line 537):**
-```
+```text
 Old: class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 z-10"
 New: class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cui-neutral z-10"
 ```
 
 **Timeline node ring (line 555):**
-```
+```text
 Old: ring-4 ring-white dark:ring-gray-900
 New: ring-4 ring-cui-base-1
 ```
 
 **Expanded milestone ring accent (line 556):**
-```
+```text
 Old: ring-coderabbit-orange/40
 New: ring-cui-accent/40
 ```
 
 **Timeline node label (line 562):**
-```
+```text
 Old: class="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mt-1.5 text-center leading-tight max-w-[90px] line-clamp-2"
 New: class="text-[10px] font-semibold text-cui-secondary mt-1.5 text-center leading-tight max-w-[90px] line-clamp-2"
 ```
 
 **Scroll hint (lines 573–577):**
-```
+```text
 Old: class="flex items-center justify-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500"
 New: class="flex items-center justify-center gap-2 mt-2 text-xs text-cui-tertiary"
 ```
 
 **Milestone detail title (line 595):**
-```
+```text
 Old: class="text-base font-bold text-gray-900 dark:text-white"
 New: class="text-base font-bold text-cui-primary"
 ```
 
 **Milestone detail description (line 603):**
-```
+```text
 Old: class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2"
 New: class="text-sm text-cui-secondary leading-relaxed mt-2"
 ```
 
 **Milestone date text (line 605):**
-```
+```text
 Old: class="text-xs text-gray-400 dark:text-gray-500 font-mono"
 New: class="text-xs text-cui-tertiary font-mono"
 ```
 
 **Milestone "View on GitHub" link (line 613):**
-```
+```text
 Old: class="inline-flex items-center gap-1 text-xs font-medium text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
 New: class="inline-flex items-center gap-1 text-xs font-medium text-cui-accent hover:text-cui-accent/70 transition-colors"
 ```
 
 **Milestone close button (line 621):**
-```
+```text
 Old: class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors text-lg leading-none p-1"
 New: class="text-cui-tertiary hover:text-cui-secondary transition-colors text-lg leading-none p-1"
 ```
 
 **No events text (line 631):**
-```
+```text
 Old: class="text-sm text-gray-400 dark:text-gray-500"
 New: class="text-sm text-cui-tertiary"
 ```
 
 **"Show all events" link (line 633):**
-```
+```text
 Old: class="mt-2 text-xs text-coderabbit-orange hover:text-coderabbit-orange/70 transition-colors"
 New: class="mt-2 text-xs text-cui-accent hover:text-cui-accent/70 transition-colors"
 ```
 
 **Empty state text (lines 639, 644, 817, 822–823):**
-```
+```text
 Old: class="py-12 text-center text-gray-500 dark:text-gray-400"
      or: class="py-12 text-center text-gray-400 dark:text-gray-500"
 New: class="py-12 text-center text-cui-tertiary"
 ```
 
 **Font mono watermarks (lines 388, 828–829):**
-```
+```text
 Old: class="text-xs text-gray-400 dark:text-gray-600 font-mono"
 New: class="text-xs text-cui-tertiary font-mono"
 ```
 
 **Insights repo cards (line 768):**
-```
+```text
 Old: class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/30 p-4"
 New: class="rounded-xl border border-cui-neutral bg-cui-neutral-subtle p-4"
 ```
 
 **Insights repo name link (line 779):**
-```
+```text
 Old: class="text-sm md:text-base font-semibold text-gray-900 dark:text-white hover:text-coderabbit-orange transition-colors truncate block"
 New: class="text-sm md:text-base font-semibold text-cui-primary hover:text-cui-accent transition-colors truncate block"
 ```
 
 **Insights repo metadata (line 784):**
-```
+```text
 Old: class="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
 New: class="mt-1 flex items-center gap-2 text-xs text-cui-secondary"
 ```
@@ -903,49 +901,49 @@ New: class="mt-1 flex items-center gap-2 text-xs text-cui-secondary"
 ```
 
 **Insights accordion chevron (lines 792–793):**
-```
+```text
 Old: class="text-gray-400 dark:text-gray-500 transition-transform"
 New: class="text-cui-tertiary transition-transform"
 ```
 
 **Insights yearly breakdown (line 798):**
-```
+```text
 Old: class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2"
 New: class="mt-3 pt-3 border-t border-cui-neutral space-y-2"
 ```
 
 **Insights year cards (line 800):**
-```
+```text
 Old: class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/50 px-3 py-2"
 New: class="rounded-lg border border-cui-neutral bg-cui-base-2 px-3 py-2"
 ```
 
 **Insights year title (line 802):**
-```
+```text
 Old: class="text-sm font-semibold text-gray-800 dark:text-gray-100"
 New: class="text-sm font-semibold text-cui-primary"
 ```
 
 **Insights year total (line 803):**
-```
+```text
 Old: class="text-xs text-gray-500 dark:text-gray-400"
 New: class="text-xs text-cui-secondary"
 ```
 
 **Insights year breakdown grid (line 805):**
-```
+```text
 Old: class="mt-1 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300"
 New: class="mt-1 grid grid-cols-2 gap-2 text-xs text-cui-secondary"
 ```
 
 **Loading spinner border-t accent (lines 475, 747):**
-```
+```text
 Old: class="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-700 border-t-coderabbit-orange"
 New: class="animate-spin rounded-full h-10 w-10 border-4 border-cui-neutral border-t-cui-accent"
 ```
 
 **Loading text (lines 477, 749):**
-```
+```text
 Old: class="text-sm text-gray-500 dark:text-gray-400"
 New: class="text-sm text-cui-secondary"
 ```
@@ -953,31 +951,31 @@ New: class="text-sm text-cui-secondary"
 - [ ] **Step 2: Update milestone utility method defaults**
 
 In the `getMilestoneNodeClasses` default case (line 1303):
-```
+```text
 Old: return 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
 New: return 'bg-cui-neutral text-cui-secondary';
 ```
 
 In the `getMilestoneCardClasses` default case (line 1321):
-```
+```text
 Old: return 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700';
 New: return 'bg-cui-neutral-subtle border-cui-neutral';
 ```
 
 In the `getMilestoneAccentClasses`, replace only the `coderabbit-orange` case (line 1328):
-```
+```text
 Old: return 'bg-coderabbit-orange';
 New: return 'bg-cui-accent';
 ```
 
 The `getMilestoneAccentClasses` default (line 1339):
-```
+```text
 Old: return 'bg-gray-400';
 New: return 'bg-cui-neutral';
 ```
 
 In `getMilestoneBadgeClasses` default (line 1350):
-```
+```text
 Old: return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
 New: return 'bg-cui-neutral-subtle text-cui-secondary';
 ```

@@ -23,17 +23,17 @@ Integrate CodeRabbit's carrot-ui design system into the CommitStory Angular app 
 
 ## Approach
 
-**Direct CSS import from the `@coderabbitai/carrot-ui` npm package.** Import `scales.css` and `theme.css` from the package's `src/` directory. This keeps tokens in sync with upstream updates and avoids vendoring.
+**Direct CSS import from the `@coderabbitai/carrot-ui` npm package.** Import via the package-root exports (`@coderabbitai/carrot-ui/scales` and `@coderabbitai/carrot-ui/theme`). This keeps tokens in sync with upstream updates and avoids vendoring.
 
 ## Architecture
 
 ### CSS Layer Stack
 
-```
+```text
 styles.css
 ├── @import "tailwindcss"
-├── @import "@coderabbitai/carrot-ui/src/scales.css"   (12-step color scales)
-├── @import "@coderabbitai/carrot-ui/src/theme.css"    (semantic tokens + keyframes)
+├── @import "@coderabbitai/carrot-ui/scales"            (12-step color scales)
+├── @import "@coderabbitai/carrot-ui/theme"             (semantic tokens + keyframes)
 ├── @custom-variant dark (...)                          (data-theme dark mode)
 ├── @theme { ... }                                     (app-specific overrides)
 └── App-specific utilities (scrollbar, line-clamp)
@@ -73,9 +73,9 @@ styles.css
 
 ### Typography
 
-- Install `@fontsource-variable/geist` and `hack-font` as dependencies
+- Install `@fontsource-variable/geist` as a dependency (Hack font is referenced via carrot-ui's `font-cui-mono` token but its CSS import was removed due to woff resolution issues — the system mono stack provides the fallback)
 - Body text uses `font-cui-sans` (Geist Variable) at `text-cui-base` (14px/20px)
-- Code/mono text uses `font-cui-mono` (Hack)
+- Code/mono text uses `font-cui-mono` (system monospace fallback)
 - Four size levels: `text-cui-sm` (12px), `text-cui-base` (14px), `text-cui-lg` (18px), `text-cui-xl` (24px)
 
 ### Custom Animations (preserved)
@@ -94,7 +94,7 @@ Timeline scrollbar colors update from `theme('colors.gray.300')` to `var(--borde
 
 | File | Change |
 |---|---|
-| `package.json` | Add `@fontsource-variable/geist`, `hack-font`; `@coderabbitai/carrot-ui` already installed |
+| `package.json` | Add `@fontsource-variable/geist`; move `@coderabbitai/carrot-ui` to devDependencies |
 | `yourstory/tailwind.config.js` | Delete |
 | `yourstory/src/styles.css` | Rewrite: TW v4 imports + carrot-ui tokens + custom animations |
 | `yourstory/src/app/core/services/theme.service.ts` | Switch from class toggle to `data-theme` attribute |
@@ -105,12 +105,12 @@ Timeline scrollbar colors update from `theme('colors.gray.300')` to `var(--borde
 ## Testing
 
 - Build passes (`nx build yourstory`)
-- Existing unit tests pass (`nx test yourstory`)
-- Visual verification: light and dark modes render correctly with new tokens
+- Unit tests: pre-existing `window.matchMedia is not a function` failure in jsdom (not caused by this migration — requires a `matchMedia` mock in `test-setup.ts`)
+- Visual verification: light and dark modes render correctly with new tokens (manual check pending)
 
-## Vite Configuration
+## Build Configuration
 
-The Tailwind v4 Vite plugin (`@tailwindcss/vite`) must be added to `yourstory/vite.config.mts`. This replaces the PostCSS-based Tailwind processing used in v3. The `tailwindcss` and `autoprefixer` PostCSS plugins are no longer needed.
+Angular's `@angular/build:application` executor uses esbuild (not Vite) for production builds. Tailwind v4 is processed via `@tailwindcss/postcss` configured in `yourstory/.postcssrc.json`. A `@source` directive in `styles.css` ensures Angular's inline templates are scanned for class usage.
 
 ## Risks
 

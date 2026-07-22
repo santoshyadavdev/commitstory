@@ -137,7 +137,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             <div class="mb-6 flex items-center gap-2 text-sm text-cui-secondary">
               <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-cui-neutral" />
               <span class="font-medium text-cui-primary">{{ profile.name || profile.login }}</span>
-              <span class="text-gray-400">·</span>
+              <span class="text-cui-tertiary">·</span>
               <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-cui-accent hover:underline">@{{ profile.login }}</a>
             </div>
           }
@@ -359,7 +359,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             <div class="mb-6 flex items-center gap-2 text-sm text-cui-secondary">
               <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-cui-neutral" />
               <span class="font-medium text-cui-primary">{{ profile.name || profile.login }}</span>
-              <span class="text-gray-400">·</span>
+              <span class="text-cui-tertiary">·</span>
               <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-cui-accent hover:underline">@{{ profile.login }}</a>
             </div>
           }
@@ -699,7 +699,7 @@ import { SharePlatform } from '../../core/constants/share.constants';
             <div class="mb-6 flex items-center gap-2 text-sm text-cui-secondary">
               <img [src]="profile.avatar_url" [alt]="profile.login" class="w-6 h-6 rounded-full border border-cui-neutral" />
               <span class="font-medium text-cui-primary">{{ profile.name || profile.login }}</span>
-              <span class="text-gray-400">·</span>
+              <span class="text-cui-tertiary">·</span>
               <a [href]="profile.html_url" target="_blank" rel="noopener noreferrer" class="text-cui-accent hover:underline">@{{ profile.login }}</a>
             </div>
           }
