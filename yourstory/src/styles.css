@@ -1,8 +1,7 @@
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
-@import "hack-font/build/web/hack-subset.css";
-@import "@coderabbitai/carrot-ui/src/scales.css";
-@import "@coderabbitai/carrot-ui/src/theme.css";
+@import "@coderabbitai/carrot-ui/scales";
+@import "@coderabbitai/carrot-ui/theme";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
