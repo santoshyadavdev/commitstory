@@ -5,11 +5,11 @@ import { ThemeService } from '../core/services/theme.service';
   selector: 'app-header',
   standalone: true,
   template: `
-    <header class="bg-coderabbit-cream dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
+    <header class="bg-cui-base-1 border-b border-cui-neutral px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <img src="/coderabbit-icon-dark.svg" alt="CommitStory logo" class="w-7 h-7 block dark:hidden" />
         <img src="/coderabbit-icon-light.svg" alt="CommitStory logo" class="w-7 h-7 hidden dark:block" />
-        <span class="text-gray-900 dark:text-white font-bold text-lg tracking-tight">CommitStory</span>
+        <span class="text-cui-primary font-bold text-lg tracking-tight">CommitStory</span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -18,7 +18,7 @@ import { ThemeService } from '../core/services/theme.service';
           href="https://github.com/santoshyadavdev/commitstory"
           target="_blank"
           rel="noopener noreferrer"
-          class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          class="w-8 h-8 flex items-center justify-center rounded-lg text-cui-secondary hover:text-cui-primary bg-cui-base-2 hover:bg-cui-subtle transition-colors"
           aria-label="GitHub repository"
           title="GitHub repository"
         >
@@ -30,7 +30,7 @@ import { ThemeService } from '../core/services/theme.service';
         <!-- Theme toggle -->
         <button
         (click)="themeService.toggle()"
-        class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+        class="w-8 h-8 flex items-center justify-center rounded-lg text-cui-secondary hover:text-cui-primary bg-cui-base-2 hover:bg-cui-subtle transition-colors cursor-pointer"
         [attr.aria-label]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
         [attr.title]="themeService.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
       >
