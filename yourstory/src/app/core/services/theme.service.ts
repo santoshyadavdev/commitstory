@@ -53,11 +53,6 @@ export class ThemeService {
 
   private applyTheme(dark: boolean): void {
     if (!this.isBrowser) return;
-    const html = document.documentElement;
-    if (dark) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   }
 }
