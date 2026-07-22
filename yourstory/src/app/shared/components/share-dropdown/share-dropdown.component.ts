@@ -33,7 +33,7 @@ const PLATFORMS: PlatformOption[] = [
       <!-- Trigger button -->
       <button
         (click)="toggle($event)"
-        class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 transition-colors cursor-pointer"
+        class="flex items-center gap-2 bg-cui-base-2 hover:bg-cui-subtle text-cui-primary text-sm font-medium px-4 py-2 rounded-lg border border-cui-neutral transition-colors cursor-pointer"
         [attr.aria-expanded]="open()"
         aria-haspopup="true"
         aria-label="Share"
@@ -53,21 +53,21 @@ const PLATFORMS: PlatformOption[] = [
       <!-- Dropdown menu -->
       @if (open()) {
         <div
-          class="fixed bottom-4 left-4 right-4 w-auto sm:absolute sm:bottom-full sm:mb-2 sm:left-auto sm:right-0 sm:w-64 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl z-50 overflow-hidden"
+          class="fixed bottom-4 left-4 right-4 w-auto sm:absolute sm:bottom-full sm:mb-2 sm:left-auto sm:right-0 sm:w-64 rounded-xl border border-cui-neutral bg-cui-base-2 shadow-xl z-50 overflow-hidden"
           role="menu"
         >
           <!-- Clipboard hint -->
-          <div class="px-4 py-2.5 bg-coderabbit-orange/10 border-b border-gray-200 dark:border-gray-700 flex items-start gap-2">
+          <div class="px-4 py-2.5 bg-cui-accent-subtle border-b border-cui-neutral flex items-start gap-2">
             <span class="text-sm leading-none mt-0.5" aria-hidden="true">📋</span>
-            <p class="text-xs text-gray-600 dark:text-gray-400 leading-snug">
-              Your image will be <strong class="text-gray-900 dark:text-white">copied to clipboard</strong> — paste it into your post after opening the platform.
+            <p class="text-xs text-cui-secondary leading-snug">
+              Your image will be <strong class="text-cui-primary">copied to clipboard</strong> — paste it into your post after opening the platform.
             </p>
           </div>
 
           @for (platform of platforms; track platform.id) {
             <button
               (click)="select(platform.id)"
-              class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left cursor-pointer"
+              class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-cui-secondary hover:bg-cui-subtle transition-colors text-left cursor-pointer"
               role="menuitem"
             >
               @if (platform.svgPath) {
@@ -85,10 +85,10 @@ const PLATFORMS: PlatformOption[] = [
           }
 
           @if (shareUrl) {
-            <div class="border-t border-gray-200 dark:border-gray-700">
+            <div class="border-t border-cui-neutral">
               <button
                 (click)="copyLink()"
-                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left cursor-pointer"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-cui-secondary hover:bg-cui-subtle transition-colors text-left cursor-pointer"
                 role="menuitem"
               >
                 <span class="text-base leading-none w-4 text-center" aria-hidden="true">{{ linkCopied() ? '✅' : '🔗' }}</span>
